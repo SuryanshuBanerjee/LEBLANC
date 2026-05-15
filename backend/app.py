@@ -14,6 +14,9 @@ from engine_c_repair import repair_loop
 from llm_client import call_llm
 from database import init_db, save_run, get_all_runs
 
+# Ensure DB is initialized when deployed via Gunicorn
+init_db()
+
 app = Flask(__name__, static_folder='../frontend', static_url_path='/')
 # Restrict CORS in production!
 CORS(app, origins="*")

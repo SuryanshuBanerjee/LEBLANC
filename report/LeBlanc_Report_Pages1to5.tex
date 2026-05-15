@@ -1,0 +1,330 @@
+\documentclass[12pt,a4paper]{report}
+
+% ---------- encoding & fonts ----------
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+
+% ---------- geometry ----------
+\usepackage[top=1in,bottom=1in,left=1.25in,right=1in]{geometry}
+
+% ---------- spacing ----------
+\usepackage{setspace}
+
+% ---------- graphics ----------
+\usepackage{graphicx}
+\graphicspath{{figures/}}
+
+% ---------- tables ----------
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{multirow}
+
+% ---------- math ----------
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+% ---------- colors & listings ----------
+\usepackage{xcolor}
+\usepackage{listings}
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  keywordstyle=\bfseries\color{blue!70!black},
+  commentstyle=\itshape\color{green!50!black},
+  stringstyle=\color{red!60!black},
+  showstringspaces=false,
+  captionpos=b
+}
+
+% ---------- hyperref ----------
+\usepackage[hidelinks]{hyperref}
+\hypersetup{
+  pdfauthor={Ayushi Ranjan, Swadha Kumari, Vraj Soni, Suryanshu Banerjee},
+  pdftitle={LeBlanc: Automated Prompt Enrichment and Iterative Repair for Secure LLM-Generated Code}
+}
+
+% ---------- headers ----------
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small LeBlanc: Automated Prompt Enrichment and Iterative Repair}
+\fancyhead[R]{\small \thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ---------- chapter / section titles ----------
+\usepackage{titlesec}
+\titleformat{\chapter}[block]
+  {\large\bfseries\centering}{Chapter \thechapter:}{0.5em}{}
+\titlespacing*{\chapter}{0pt}{20pt}{10pt}
+
+% ---------- bibliography ----------
+\usepackage[style=ieee,backend=biber]{biblatex}
+\addbibresource{references.bib}
+
+% ---------- tikz ----------
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{shapes.geometric,arrows.meta,positioning,fit,backgrounds,calc}
+
+% ---------- caption ----------
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+
+% =========================================================
+\begin{document}
+\onehalfspacing
+
+% =========================================================
+% PAGE 1 -- TITLE PAGE
+% =========================================================
+\begin{titlepage}
+\centering
+\vspace*{0.2in}
+
+{\Large\bfseries K.J.\ Somaiya School of Engineering}\\[0.08in]
+{\large Department of Information Technology}\\[0.04in]
+{\normalsize Affiliated to University of Mumbai}\\[0.35in]
+
+\rule{\linewidth}{1.2pt}\\[0.18in]
+{\LARGE\bfseries LeBlanc: Automated Prompt Enrichment and\\[0.1in]
+Iterative Repair for Secure LLM-Generated Code}\\[0.12in]
+{\large A Multi-Model Comparative Study}\\[0.18in]
+\rule{\linewidth}{1.2pt}\\[0.28in]
+
+{\normalsize\itshape Project Report submitted in partial fulfillment of the requirements\\[0.04in]
+for the Degree of Bachelor of Technology in Information Technology\\[0.04in]
+Semester VI, Academic Year 2025--26}\\[0.35in]
+
+{\normalsize\bfseries Submitted by:}\\[0.12in]
+\begin{tabular}{@{}ll@{}}
+  Ayushi Ranjan       & Roll No.\ XXXX01 \\[0.04in]
+  Swadha Kumari       & Roll No.\ XXXX02 \\[0.04in]
+  Vraj Soni           & Roll No.\ XXXX03 \\[0.04in]
+  Suryanshu Banerjee  & Roll No.\ XXXX04 \\
+\end{tabular}\\[0.35in]
+
+{\normalsize\bfseries Project Guide:}\\[0.08in]
+{\normalsize Prof.\ Deepti Patole}\\[0.04in]
+{\normalsize Department of Information Technology}\\[0.04in]
+{\normalsize K.J.\ Somaiya School of Engineering}\\[0.35in]
+
+% Uncomment and place logo at figures/kjsse_logo.png to enable:
+% \includegraphics[width=1.2in]{kjsse_logo.png}\\[0.25in]
+
+{\normalsize K.J.\ Somaiya School of Engineering, Vidyavihar, Mumbai -- 400077}\\[0.06in]
+{\normalsize May 2026}
+\end{titlepage}
+
+% =========================================================
+% PAGE 2 -- CERTIFICATE
+% =========================================================
+\newpage
+\thispagestyle{empty}
+\begin{center}
+  {\Large\bfseries K.J.\ Somaiya School of Engineering}\\[0.06in]
+  {\large Department of Information Technology}\\[0.04in]
+  {\normalsize Vidyavihar, Mumbai -- 400077}\\[0.3in]
+  {\Large\bfseries CERTIFICATE}
+\end{center}
+
+\vspace{0.25in}
+\noindent This is to certify that the project titled \textbf{``LeBlanc: Automated Prompt
+Enrichment and Iterative Repair for Secure LLM-Generated Code''} has been carried
+out by the following students of the Department of Information Technology, K.J.\
+Somaiya School of Engineering, in partial fulfillment of the requirements for the
+Degree of Bachelor of Technology in Information Technology, University of Mumbai,
+during the academic year 2025--26.
+
+\vspace{0.2in}
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Name} & \textbf{Roll Number} \\
+\midrule
+Ayushi Ranjan       & XXXX01 \\
+Swadha Kumari       & XXXX02 \\
+Vraj Soni           & XXXX03 \\
+Suryanshu Banerjee  & XXXX04 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\vspace{0.3in}
+\noindent The work has been carried out under our supervision and is found to be
+satisfactory and worthy of acceptance.
+
+\vspace{0.7in}
+\noindent
+\begin{tabular}{@{}p{2.8in}p{2.5in}@{}}
+  \textbf{Prof.\ Deepti Patole}       & \textbf{Dr.\ [HOD Name]}             \\[0.04in]
+  Project Guide                       & Head of Department                   \\[0.04in]
+  Dept.\ of Information Technology    & Dept.\ of Information Technology     \\[0.04in]
+  K.J.\ Somaiya School of Engineering & K.J.\ Somaiya School of Engineering  \\
+\end{tabular}
+
+\vspace{0.5in}
+\noindent\textbf{Date:}\enspace\underline{\hspace{1.8in}}\hfill\textbf{Place:}\enspace Mumbai
+
+% =========================================================
+% PAGE 3 -- DECLARATION
+% =========================================================
+\newpage
+\thispagestyle{empty}
+\begin{center}
+  {\Large\bfseries DECLARATION}
+\end{center}
+
+\vspace{0.25in}
+\noindent We, the undersigned students of the Department of Information Technology,
+K.J.\ Somaiya School of Engineering, hereby declare that the project titled
+\textbf{``LeBlanc: Automated Prompt Enrichment and Iterative Repair for Secure
+LLM-Generated Code''} submitted in partial fulfillment of the requirements for the
+Degree of Bachelor of Technology in Information Technology, University of Mumbai,
+is our own original work carried out during the academic year 2025--26.
+
+\vspace{0.15in}
+\noindent We further declare that:
+\begin{enumerate}
+  \item This work has not been submitted, in whole or in part, for any other degree
+        or examination at this or any other institution.
+  \item All sources of information and literature used in this project have been duly
+        acknowledged and cited in the references section.
+  \item The project does not involve any fabrication, falsification, or
+        misrepresentation of data or results.
+  \item All experimental pipeline runs, benchmark evaluations, and software
+        artifacts described in this report were developed and executed by our team
+        during the stated period.
+  \item Where third-party datasets, tools, or APIs have been used, their origins
+        have been clearly identified and all applicable terms of use have been
+        followed.
+\end{enumerate}
+
+\vspace{0.45in}
+\noindent
+\begin{tabular}{@{}p{2.8in}p{2.5in}@{}}
+  Ayushi Ranjan      & Swadha Kumari      \\[0.5in]
+  Vraj Soni          & Suryanshu Banerjee \\
+\end{tabular}
+
+\vspace{0.3in}
+\noindent\textbf{Date:}\enspace\underline{\hspace{1.8in}}\hfill\textbf{Place:}\enspace Mumbai
+
+% =========================================================
+% PAGE 4 -- ACKNOWLEDGEMENTS
+% =========================================================
+\newpage
+\thispagestyle{empty}
+\begin{center}
+  {\Large\bfseries ACKNOWLEDGEMENTS}
+\end{center}
+
+\vspace{0.25in}
+\noindent We thank Prof.\ Deepti Patole for her supervision throughout this project.
+Her feedback on metrics design, system architecture, and research framing shaped
+LeBlanc into a more rigorous system than we could have built without that input.
+
+\vspace{0.15in}
+\noindent We acknowledge the authors of the SecurityEval, LLMSecEval, and SecuCoGen
+datasets for making their benchmark prompts and annotations publicly available.
+Our empirical evaluation relies on these resources directly.
+
+\vspace{0.15in}
+\noindent We thank Semgrep Inc.\ and the Python Security Project for maintaining
+the open-source static analysis tools that form the detection core of Engine~B.
+Without reliable, deterministic scanners the entire pipeline would rest on LLM
+opinion rather than rule-based analysis.
+
+\vspace{0.15in}
+\noindent API access for Google Gemini 2.5 Flash was provisioned through Google
+AI Studio. API access for Cohere Command-A was provisioned through the Cohere
+platform, and access for Meta Llama 3.1-8B was provisioned through Groq's
+inference API.
+
+\vspace{0.15in}
+\noindent Finally, we thank the Department of Information Technology, K.J.\
+Somaiya School of Engineering, for providing the infrastructure and academic
+environment that made this project possible.
+
+% =========================================================
+% PAGE 5 -- ABSTRACT
+% =========================================================
+\newpage
+\thispagestyle{empty}
+\begin{center}
+  {\Large\bfseries ABSTRACT}
+\end{center}
+
+\vspace{0.2in}
+\noindent Large language models are increasingly used to generate production code,
+yet empirical studies show that a significant fraction of their output contains
+exploitable security weaknesses. Existing evaluations are largely single-turn and
+single-model: a prompt goes in, code comes out, a scanner marks it vulnerable or
+clean, and the loop ends there. No prior system closes the full cycle from
+proactively warning the model, to detecting what it still gets wrong, to
+autonomously repairing the output across multiple models running simultaneously.
+
+\vspace{0.15in}
+\noindent This report presents \textbf{LeBlanc}, a three-engine pipeline designed
+to fill that gap. Engine~A performs rule-based CWE-aware prompt enrichment: before
+any LLM call, it parses the user's prompt for security-relevant keywords and
+injects structured warnings drawn from a hand-curated CWE mapping file.
+Engine~B runs the generated code through Semgrep and Bandit in parallel, mapping
+raw scanner output to CWE identifiers, severity levels, and human-readable
+vulnerability categories. Engine~C executes an iterative repair loop: when
+Engine~B finds vulnerabilities, it constructs a structured repair prompt from the
+scanner findings and resubmits it to the originating LLM, re-scanning the result
+after each attempt for up to three iterations or until the output is clean.
+
+\vspace{0.15in}
+\noindent We evaluate the pipeline across three models---Cohere Command-A,
+Google Gemini 2.5 Flash, and Meta Llama 3.1-8B---on 33 security-sensitive prompts
+drawn from the LLMSecEval benchmark, covering ten CWE types across five
+vulnerability categories. Each prompt is run in three modes: plain, CWE-enriched,
+and enriched with iterative repair. Results are benchmarked against the GitHub
+Copilot 2022 baseline vulnerability rate of 63.4\% reported by Pearce et
+al.~\cite{pearce2022asleep}.
+
+\vspace{0.15in}
+\noindent Key findings: Command-A and Gemini 2.5 Flash achieve vulnerability rates
+of 57.1\% and 54.5\% respectively in plain mode, both below the Copilot baseline.
+CWE-aware prompt enrichment reduces Command-A's vulnerability rate by a further
+42.9\%. The iterative repair loop resolves vulnerabilities in 77\% of runs that
+enter Engine~C, with a mean of 1.4 iterations to convergence. Llama 3.1-8B shows
+degraded performance under enrichment; we attribute this to the model's limited
+instruction-following capacity at 8B parameters rather than a failure of the
+enrichment strategy itself. This finding motivates future evaluation on larger
+open-weight models such as Llama 3.3-70B.
+
+\vspace{0.15in}
+\noindent The system is implemented as a web application with a Flask backend,
+an HTML/JavaScript frontend, and a SQLite database that logs every prompt,
+generated code, scan result, and repair iteration for reproducibility. A VS~Code
+extension and a full three-repetition dataset collection run are identified as
+near-term future work.
+
+\vspace{0.18in}
+\noindent\textbf{Keywords:} LLM code generation, software security, static analysis,
+prompt engineering, CWE, iterative repair, Semgrep, Bandit, vulnerability rate,
+multi-model evaluation
+
+% =========================================================
+% FRONT MATTER -- TOC / LOF / LOT
+% =========================================================
+\newpage
+\tableofcontents
+
+\newpage
+\listoffigures
+
+\newpage
+\listoftables
+
+\end{document}

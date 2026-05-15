@@ -1,0 +1,479 @@
+\documentclass[12pt,a4paper]{report}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[top=1in,bottom=1in,left=1.25in,right=1in]{geometry}
+\usepackage{setspace}
+\usepackage{graphicx}
+\graphicspath{{figures/}}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{multirow}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{xcolor}
+\usepackage{listings}
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  keywordstyle=\bfseries\color{blue!70!black},
+  commentstyle=\itshape\color{green!50!black},
+  stringstyle=\color{red!60!black},
+  showstringspaces=false,
+  captionpos=b,
+  language=Python
+}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{shapes.geometric,arrows.meta,positioning,fit,backgrounds,calc}
+\usepackage[style=ieee,backend=biber]{biblatex}
+\addbibresource{references.bib}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small LeBlanc: Automated Prompt Enrichment and Iterative Repair}
+\fancyhead[R]{\small \thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\titleformat{\chapter}[block]
+  {\large\bfseries\centering}{Chapter \thechapter:}{0.5em}{}
+\titlespacing*{\chapter}{0pt}{20pt}{10pt}
+
+\onehalfspacing
+
+% =========================================================
+\begin{document}
+\setcounter{page}{31}
+\setcounter{chapter}{5}   % next \chapter is Chapter 6
+
+% =========================================================
+% CHAPTER 6 -- DISCUSSION
+% =========================================================
+\chapter{Discussion}
+\label{ch:discussion}
+
+\section{What the Results Show}
+\label{sec:discmain}
+
+The results across five research questions tell a consistent story: the LeBlanc
+pipeline reduces vulnerability rates across all models, but the degree of
+improvement depends heavily on the model's capacity to follow structured
+instructions.
+
+In plain mode, all three models produce fewer vulnerable runs than the Copilot
+2022 baseline of 63.4\%. This is expected: Copilot was evaluated in 2022 against
+a benchmark it was not trained to avoid, while our 2025 models have been
+instruction-tuned with substantially more safety-relevant feedback. The
+plain-mode results confirm that the field has moved, but they do not tell us
+whether that movement is enough for production use. A 45--57\% vulnerability rate
+in plain mode still means that roughly one in two generated code samples contains
+at least one medium-severity finding.
+
+Enrichment improves the picture for Command-A substantially (PEG = +42.9\%) and
+has no measurable effect on Gemini 2.5 Flash (PEG = 0\%). The repair loop
+is where the largest gains occur: all three models drop by at least 12 percentage
+points in VR from enriched mode to repair mode, and Command-A reaches a
+vulnerability rate of 18.2\% in full-pipeline mode. The practical implication
+is that the repair loop contributes more than enrichment for Gemini 2.5 Flash,
+and roughly equally for Command-A.
+
+\section{The Llama 3.1-8B Enrichment Degradation}
+\label{sec:llamadeg}
+
+The most striking individual finding is Llama 3.1-8B's negative PEG of $-$33.3\%:
+adding CWE warnings to the prompt causes the model to produce \emph{more}
+vulnerable code than it does without them. This result requires careful
+interpretation before drawing any conclusion about prompt enrichment as a strategy.
+
+The 8B parameter size matters here. The enrichment block adds 80--120 tokens of
+structured security requirements to the prompt. For a frontier model (Command-A,
+Gemini 2.5 Flash) with strong instruction-following capability, these tokens
+provide useful signal. For a model at the 8B scale, the additional tokens appear
+to compete with or overshadow the core coding instruction. The model may be
+attempting to address the security requirements and in doing so producing more
+complex---and more vulnerable---code than it would with a simpler prompt.
+
+This interpretation is consistent with published observations about small-model
+degradation under complex prompts. It is \emph{not} evidence that CWE-aware
+enrichment is counterproductive. The correct conclusion is narrower: CWE-aware
+enrichment as implemented in Engine~A is not effective for models below a certain
+instruction-following threshold, and Llama 3.1-8B is below that threshold.
+
+A reviewer who observes this result and concludes that the enrichment strategy
+is flawed is making a category error. The appropriate response is to control for
+model capability, which is exactly what RQ5 does. The plan to re-run on Llama
+3.3-70B---a model with the same architecture family but at a scale known to
+follow complex instructions reliably---will provide a direct test of whether the
+degradation is a function of the enrichment strategy or of the model size.
+
+\section{Why Deserialization Does Not Converge}
+\label{sec:discdeserial}
+
+The CR@3 of 0\% for Command-A and Llama 3.1-8B on deserialization prompts
+(Table~\ref{tab:category}) is the clearest ceiling effect in the dataset.
+CWE-502 (Deserialization of Untrusted Data) typically manifests in Python as a
+\texttt{pickle.loads} call on user-supplied data. The secure fix is not a
+code-level change to the existing call but a design-level change: replace pickle
+with a data-format library that does not allow arbitrary code execution (e.g.\
+\texttt{json}, \texttt{msgpack}), or add an allowlist-based deserialiser.
+
+Engine~C's repair prompt lists the finding and asks the LLM to fix the
+vulnerability. For deserialization, the LLM's typical response is to add a
+comment warning about the risk, or to wrap the call in a try/except block that
+catches exceptions---neither of which removes the CWE-502 finding, and both of
+which are therefore correctly flagged by Bandit on the re-scan. The model is not
+producing incorrect code; it is producing code that addresses the symptom rather
+than the cause.
+
+This is a genuine limitation of the repair loop's current prompt structure. A
+prompt that provides the model with an explicit replacement pattern (``replace
+\texttt{pickle.loads} with \texttt{json.loads} or a safe equivalent'') would
+likely achieve higher convergence. The current prompt does not do this; it
+reports the finding and instructs the model to fix it without specifying
+\emph{how}. This is an identified improvement for the next iteration of Engine~C.
+
+\section{Gemini 2.5 Flash: Enrichment Insensitivity}
+\label{sec:discgemini}
+
+Gemini 2.5 Flash's PEG of 0\% indicates that its output distribution is not
+affected by the CWE warning injection in Engine~A. Two explanations are
+plausible. First, Gemini 2.5 Flash may already incorporate security-relevant
+considerations in its base instruction tuning to a degree that makes the
+explicit CWE warnings redundant. If the model already avoids CWE-89 on SQL
+prompts without being told to, adding a warning about CWE-89 provides no
+additional signal.
+
+Second, the model's output may be determined more by its temperature setting
+and top-$p$ sampling than by the additional tokens in the enrichment block.
+At the low temperature of 0.2 used across all models, Gemini 2.5 Flash's
+outputs are already near-deterministic, and the small perturbation from the
+enrichment block may not shift the probability mass enough to change the output.
+
+Distinguishing between these explanations would require a targeted experiment:
+run the enrichment ablation at higher temperatures (0.7--1.0) to increase output
+variance and check whether PEG becomes non-zero. This is out of scope for the
+current evaluation but is a clean experimental question for future work.
+
+\section{Limitations}
+\label{sec:limitations}
+
+Four limitations are worth stating explicitly.
+
+\textbf{Single repetition.} Each prompt was run once per model per mode. LLM
+outputs are stochastic: the same prompt can produce both a vulnerable and a clean
+result across repeated runs. Single-rep results are directionally valid but
+cannot support confidence intervals or variance estimates. Three repetitions per
+prompt per model per mode (totalling approximately 900 runs) would be the minimum
+for publication-quality claims.
+
+\textbf{Bandit-only scanning.} The current implementation uses Bandit as the
+sole scanner. Semgrep was included in the original design but removed from the
+production configuration during development. Bandit covers a wide range of
+common Python weaknesses but has known gaps: CWE-22 (Path Traversal) is caught
+inconsistently depending on how the file path is constructed, and certain
+logic-level access control weaknesses (CWE-285, CWE-306) may not be caught at
+all if they manifest as missing checks rather than insecure calls. A dual-scanner
+configuration (Bandit + Semgrep with the \texttt{p/python-security} rule pack)
+would provide more complete coverage and should be restored in the next iteration.
+
+\textbf{Dataset size and CWE coverage.} Thirty-three prompts across ten CWE types
+gives an average of 3.3 prompts per CWE type. Per-CWE analysis at this granularity
+has high variance. The deserialization category in particular has only two prompts,
+making the 0\% CR@3 figure suggestive but not definitive. Expanding to the full
+LLMSecEval set (120 prompts) or integrating the CodeSecEval benchmark would
+provide more statistically reliable per-category estimates.
+
+\textbf{False positive rate.} Bandit produces false positives, particularly for
+medium-severity findings that are context-dependent. We did not perform a manual
+verification pass on the scan results in this evaluation. An estimated false
+positive rate of 10--15\% is consistent with published Bandit evaluations. If
+10\% of our VULN results are false positives, the true vulnerability rates in
+Table~\ref{tab:vr} would be approximately 5--6 percentage points lower than
+reported. This does not reverse any of the directional findings but would reduce
+the absolute VR figures.
+
+% =========================================================
+% CHAPTER 7 -- CONCLUSION AND FUTURE WORK
+% =========================================================
+\chapter{Conclusion and Future Work}
+\label{ch:conclusion}
+
+\section{Summary}
+\label{sec:summary}
+
+This report presented LeBlanc, a three-engine pipeline for automated prompt
+enrichment, static vulnerability scanning, and iterative repair of LLM-generated
+Python code. The system was evaluated across three models (Cohere Command-A,
+Google Gemini 2.5 Flash, Meta Llama 3.1-8B), three pipeline modes (plain,
+enriched, enriched with repair), and 33 prompts from the LLMSecEval benchmark,
+producing 321 total runs logged to a reproducible SQLite database.
+
+The main findings are:
+
+\begin{itemize}
+  \item All three models produce fewer vulnerable runs than the Copilot 2022
+        baseline (63.4\%) in plain mode, confirming that LLM code security has
+        improved since 2022 but has not reached acceptable levels.
+
+  \item CWE-aware prompt enrichment reduces Command-A's vulnerability rate by
+        42.9\% relative (PEG = +42.9\%) and has no statistically meaningful
+        effect on Gemini 2.5 Flash (PEG = 0\%). Llama 3.1-8B degrades under
+        enrichment (PEG = $-$33.3\%), a result we attribute to insufficient
+        instruction-following capacity at 8B parameters.
+
+  \item The iterative repair loop resolves vulnerabilities in 77\% of the 61
+        runs that enter Engine~C, with a mean of 1.4 iterations. Command-A is
+        the most repair-responsive model (CR@3 = 89.5\%); Llama 3.1-8B is the
+        least (CR@3 = 62.5\%).
+
+  \item Deserialization (CWE-502) is the hardest category to repair: the loop
+        does not converge within three iterations for Command-A or Llama 3.1-8B.
+        Injection, Access Control, and File Handling converge reliably.
+
+  \item In full-pipeline mode (enriched + repair), Command-A achieves a
+        vulnerability rate of 18.2\%, representing a 71.3\% improvement over
+        the Copilot baseline.
+\end{itemize}
+
+LeBlanc is the first system to combine automated CWE-aware prompt enrichment,
+multi-model parallel evaluation, and iterative automated repair with re-scanning
+in a single deployable pipeline. The combination of a working web application and
+a logged reproducible dataset contributes both a research tool and empirical data
+to the open literature.
+
+\section{Future Work}
+\label{sec:futurework}
+
+\subsection{Larger Open-Weight Models}
+\label{ssec:fw_llama}
+
+The most immediate next step is to re-run the full evaluation on Llama 3.3-70B
+using the same Groq API access. The model identifier change in
+\texttt{llm\_client.py} is a single line:
+
+\begin{lstlisting}[language={}, caption={Model string replacement for Llama 3.3-70B}]
+"llama3.3-70b": {
+    "provider": "groq",
+    "api_model": "llama-3.3-70b-versatile"
+}
+\end{lstlisting}
+
+Llama 3.3-70B uses the same architecture family as Llama 3.1-8B but at a scale
+that has demonstrated strong instruction-following on complex prompts. If its PEG
+is positive---as expected from the model-size analysis in
+Section~\ref{sec:llamadeg}---this would confirm that the enrichment degradation
+observed in this evaluation is a size effect rather than a strategy effect, and
+would establish Llama 3.3-70B as a viable open-weight option for deployment.
+
+\subsection{Three-Repetition Dataset}
+\label{ssec:fw_reps}
+
+All current results are based on a single run per prompt per model per mode.
+A three-repetition run ($33 \times 3 \times 3 \times 3 = 891$ runs) would
+allow variance estimation across the vulnerability rate metrics. The
+\texttt{run\_batch.py} script already supports \texttt{--reps N} for this
+purpose. The cost is approximately 900 API calls; at current Groq and Cohere
+pricing this is within budget for a semester project.
+
+\subsection{Dual Scanner: Bandit and Semgrep}
+\label{ssec:fw_semgrep}
+
+The production Engine~B currently uses Bandit only. Semgrep with the
+\texttt{p/python-security} rule pack covers additional CWE types---notably
+CWE-22 (Path Traversal) via taint analysis---and would reduce the false negative
+rate on path traversal and injection categories. The \texttt{run\_semgrep}
+function exists in the codebase and ran correctly during development; it was
+disabled for performance reasons. With the \texttt{p/python-security} rule pack
+replacing \texttt{--config=auto}, startup time is acceptable and re-enabling
+Semgrep should be straightforward.
+
+\subsection{Engine C Repair Prompt Specialisation}
+\label{ssec:fw_enginec}
+
+The current repair prompt is generic: it lists findings and instructs the model
+to fix them. For deserialization vulnerabilities (CWE-502) this generic
+instruction does not produce convergence because the correct fix requires a
+design-level change that the model does not infer from the finding description
+alone. A set of category-specific repair prompt templates---one per
+vulnerability category---would provide the model with explicit fix patterns
+(``replace \texttt{pickle.loads} with \texttt{json.loads}'', ``use
+\texttt{os.path.realpath} and validate the result against a base directory'')
+and is expected to substantially improve CR@3 on the categories that currently
+show low convergence.
+
+\subsection{VS Code Extension}
+\label{ssec:fw_vscode}
+
+The web application is a research and demonstration platform. The intended
+production deployment is a VS Code extension that calls the same backend
+pipeline on the currently open file, highlights vulnerable lines in-editor,
+and surfaces repair suggestions inline. The backend API design---with
+\texttt{POST /api/run} accepting arbitrary prompt text and returning structured
+scan and repair results---was specifically designed to support this integration.
+
+The extension would be implemented in TypeScript using the VS Code Extension
+API. On file save or manual trigger, it would extract the current file content,
+send it as a prompt to \texttt{POST /api/run} in \texttt{enriched\_repair} mode,
+and use the returned \texttt{scan\_results} to create diagnostic markers on the
+affected lines. The \texttt{final\_code} from the repair result would be offered
+as a one-click inline fix.
+
+This work is out of scope for Semester VI but is the planned Semester VII
+continuation. The API contract is already stable; no backend changes are required
+to support the extension.
+
+\subsection{Expanded Dataset and CWE Coverage}
+\label{ssec:fw_dataset}
+
+The 33-prompt LLMSecEval subset covers ten CWE types. The full LLMSecEval
+benchmark has 120 prompts and broader CWE coverage. Integration of the
+CodeSecEval benchmark (44 CWE types, 180 samples) would allow per-CWE analysis
+with statistical power sufficient for publication. Both datasets are publicly
+available and compatible with the existing \texttt{prompts.json} format.
+
+\subsection{False Positive Rate Validation}
+\label{ssec:fw_fpr}
+
+A manual review of a 10\% random sample of scan findings would produce a false
+positive rate estimate for the paper. At 321 runs with an average of approximately
+2 findings per vulnerable run, a 10\% sample is roughly 64 findings. Each finding
+requires a human to read the generated code and determine whether the Bandit
+finding is a genuine vulnerability or a false alarm. This is achievable in a
+single working day and would substantially strengthen the methodology section of
+any conference submission.
+
+\section{Closing Remarks}
+\label{sec:closing}
+
+LeBlanc demonstrates that a three-engine pipeline---automated enrichment,
+deterministic static analysis, iterative repair---can systematically reduce the
+vulnerability rate of LLM-generated Python code below the Copilot 2022 baseline
+for every model tested. The system is deployable, the dataset is reproducible,
+and the results are expressed in metrics that map directly to the five research
+questions stated at the outset.
+
+The most important open question the results raise is not whether the pipeline
+works---the 77\% repair success rate and the 71.3\% RI for Command-A indicate
+that it does---but how far these gains transfer to a wider range of models,
+more CWE types, and higher-stakes code generation scenarios. The next evaluation
+sprint, with Llama 3.3-70B, three repetitions, dual scanners, and category-aware
+repair prompts, will answer that question directly.
+
+% =========================================================
+% APPENDIX A -- CWE Category Mapping
+% =========================================================
+\appendix
+\chapter{CWE Category Mapping}
+\label{app:cwemap}
+
+Table~\ref{tab:cwemap} lists all CWE identifiers used in the LeBlanc pipeline,
+their names, and the category each is assigned in \texttt{cwe\_categories.py}.
+
+\begin{longtable}{@{}lll@{}}
+\caption{CWE to category mapping used throughout the system}
+\label{tab:cwemap} \\
+\toprule
+\textbf{CWE ID} & \textbf{CWE Name} & \textbf{Category} \\
+\midrule
+\endfirsthead
+\multicolumn{3}{c}{\small\itshape (Table~\ref{tab:cwemap} continued)} \\
+\toprule
+\textbf{CWE ID} & \textbf{CWE Name} & \textbf{Category} \\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+CWE-20  & Improper Input Validation              & Injection \\
+CWE-78  & OS Command Injection                   & Injection \\
+CWE-79  & Cross-Site Scripting (XSS)             & Injection \\
+CWE-89  & SQL Injection                          & Injection \\
+CWE-94  & Code Injection                         & Injection \\
+CWE-256 & Plaintext Storage of a Password        & Credential Management \\
+CWE-259 & Use of Hard-coded Password             & Credential Management \\
+CWE-327 & Use of a Broken or Risky Crypto Algorithm & Credential Management \\
+CWE-328 & Use of Weak Hash                       & Credential Management \\
+CWE-338 & Use of Cryptographically Weak PRNG     & Credential Management \\
+CWE-521 & Weak Password Requirements             & Credential Management \\
+CWE-798 & Use of Hard-coded Credentials          & Credential Management \\
+CWE-285 & Improper Authorisation                 & Access Control \\
+CWE-287 & Improper Authentication                & Access Control \\
+CWE-306 & Missing Authentication for Critical Function & Access Control \\
+CWE-384 & Session Fixation                       & Access Control \\
+CWE-614 & Sensitive Cookie Without Secure Flag   & Access Control \\
+CWE-732 & Incorrect Permission Assignment        & Access Control \\
+CWE-200 & Exposure of Sensitive Information      & Information Exposure \\
+CWE-209 & Error Message Contains Sensitive Info  & Information Exposure \\
+CWE-532 & Insertion of Sensitive Info into Log   & Information Exposure \\
+CWE-377 & Insecure Temporary File                & File Handling \\
+CWE-434 & Unrestricted Upload of Dangerous File  & File Handling \\
+CWE-22  & Improper Limitation of Pathname (Path Traversal) & Path Traversal \\
+CWE-23  & Relative Path Traversal                & Path Traversal \\
+CWE-36  & Absolute Path Traversal                & Path Traversal \\
+CWE-502 & Deserialization of Untrusted Data      & Deserialization \\
+CWE-611 & XML External Entity (XXE) Injection    & Deserialization \\
+\end{longtable}
+
+% =========================================================
+% APPENDIX B -- Bandit Rule ID to Category Mapping
+% =========================================================
+\chapter{Bandit Rule to Category Mapping}
+\label{app:banditmap}
+
+Table~\ref{tab:banditmap} lists the Bandit rule IDs used by Engine~B's category
+mapping function and their assigned categories.
+
+\begin{longtable}{@{}lll@{}}
+\caption{Bandit rule IDs and category assignments}
+\label{tab:banditmap} \\
+\toprule
+\textbf{Rule ID} & \textbf{Rule Name} & \textbf{Category} \\
+\midrule
+\endfirsthead
+\multicolumn{3}{c}{\small\itshape (Table~\ref{tab:banditmap} continued)} \\
+\toprule
+\textbf{Rule ID} & \textbf{Rule Name} & \textbf{Category} \\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+B102 & exec\_used                                & Injection \\
+B307 & eval\_used                                & Injection \\
+B404 & import\_subprocess                        & Injection \\
+B602 & subprocess\_popen\_with\_shell\_equals\_true & Injection \\
+B603 & subprocess\_without\_shell\_equals\_true   & Injection \\
+B605 & start\_process\_with\_a\_shell            & Injection \\
+B608 & hardcoded\_sql\_expressions               & Injection \\
+B105 & hardcoded\_password\_string               & Credential Management \\
+B106 & hardcoded\_password\_funcarg              & Credential Management \\
+B107 & hardcoded\_password\_default              & Credential Management \\
+B303 & md5 (weak hash)                           & Credential Management \\
+B311 & random (insecure PRNG)                    & Credential Management \\
+B324 & hashlib (weak algorithm)                  & Credential Management \\
+B501 & request\_with\_no\_cert\_validation       & Credential Management \\
+B104 & hardcoded\_bind\_all\_interfaces          & Access Control \\
+B110 & try\_except\_pass                         & Information Exposure \\
+B112 & try\_except\_continue                     & Information Exposure \\
+B103 & set\_bad\_file\_permissions               & File Handling \\
+B108 & hardcoded\_tmp\_directory                 & File Handling \\
+B301 & pickle (deserialization)                  & Deserialization \\
+B302 & marshal (deserialization)                 & Deserialization \\
+B506 & yaml\_load (unsafe deserialization)       & Deserialization \\
+B313--B320 & xml\_bad\_* (XXE variants)          & Deserialization \\
+\end{longtable}
+
+\printbibliography[heading=bibintoc,title={References}]
+
+\end{document}

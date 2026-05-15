@@ -1,0 +1,498 @@
+\documentclass[12pt,a4paper]{report}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[top=1in,bottom=1in,left=1.25in,right=1in]{geometry}
+\usepackage{setspace}
+\usepackage{graphicx}
+\graphicspath{{figures/}}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{multirow}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{shapes.geometric,arrows.meta,positioning,fit,backgrounds,calc}
+\usepackage[style=ieee,backend=biber]{biblatex}
+\addbibresource{references.bib}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small LeBlanc: Automated Prompt Enrichment and Iterative Repair}
+\fancyhead[R]{\small \thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\titleformat{\chapter}[block]
+  {\large\bfseries\centering}{Chapter \thechapter:}{0.5em}{}
+\titlespacing*{\chapter}{0pt}{20pt}{10pt}
+
+\onehalfspacing
+
+% =========================================================
+\begin{document}
+\setcounter{page}{8}   % front matter occupies ~7 pages
+
+% =========================================================
+% CHAPTER 1 -- INTRODUCTION  (pages 6-9 approx)
+% =========================================================
+\chapter{Introduction}
+\label{ch:introduction}
+
+\section{Background and Motivation}
+\label{sec:background}
+
+The use of large language models (LLMs) as coding assistants has become
+standard practice in professional software development. Tools such as GitHub
+Copilot, ChatGPT, and Google Gemini generate syntactically correct, functionally
+plausible code within seconds of receiving a natural-language prompt. Developer
+surveys indicate that a majority of professional programmers now use at least one
+AI-assisted coding tool regularly, and this proportion is growing.
+
+This adoption creates a security problem that is less visible but well-documented.
+LLMs are trained primarily to maximize functional correctness---to produce code
+that runs and satisfies the stated requirement. They learn from public repositories
+on platforms such as GitHub, where a substantial fraction of existing code contains
+known security weaknesses. The model learns these patterns along with everything
+else, and it reproduces them when asked to write similar code.
+
+The consequence in practice is straightforward. A developer who asks an LLM to
+``write a Flask login endpoint with MySQL'' receives working code that is, with
+measurable probability, also exploitable. SQL injection parameters go unsanitised.
+Password comparison happens in plaintext. Session tokens are returned without
+appropriate flags. The developer sees the code run correctly against a test
+database, ships it, and the vulnerability ships with it.
+
+The 2022 study by Pearce et al.~\cite{pearce2022asleep} quantified this problem
+against GitHub Copilot: 40\% of the generated code samples they evaluated
+contained at least one security vulnerability, with a vulnerability rate of 63.4\%
+across the LLMSecEval prompt set. Subsequent studies on ChatGPT and other models
+found comparable or worse rates~\cite{khoury2023secure,tony2023llmseceval}. The
+problem is not specific to one model or one era of models---it appears to be a
+structural consequence of training on general-purpose code repositories without
+security-specific supervision.
+
+\section{Problem Statement}
+\label{sec:problem}
+
+Three partial solutions exist in the literature, each addressing one aspect of
+the problem but not the whole.
+
+The first class of solution modifies the training process: fine-tuning on
+secure code pairs~\cite{hexacoder2024}, preference optimisation toward secure
+outputs~\cite{lpo2024}, or constrained decoding at inference
+time~\cite{codeguard2024}. These approaches can be effective but require access
+to model weights or specialised training infrastructure. They cannot be applied
+to closed-source commercial models, and they require a new training run for each
+new model version.
+
+The second class of solution is evaluation-only: run a set of prompts through
+one or more models, scan the outputs, and report a vulnerability rate. The
+SecurityEval~\cite{securityeval}, LLMSecEval~\cite{tony2023llmseceval}, and
+CodeSecEval~\cite{codeseceval2023} benchmarks all fall into this category. These
+studies produce useful comparative data but stop at detection. They do not attempt
+to reduce vulnerability rates; they measure them.
+
+The third class addresses the enrichment side: inject CWE-specific warnings into
+the prompt before sending it to the model, on the hypothesis that explicitly
+naming the vulnerability class the model should avoid will reduce its frequency.
+The SecuCoGen study~\cite{tihanyi2023secucogenicse} demonstrated this approach
+on GPT-3.5 and found substantial reduction. However, the study used a single
+model, a fixed dataset of 180 samples, and did not include any post-generation
+repair mechanism.
+
+The gap these three classes leave is: a single deployable system that (a) enriches
+prompts with CWE warnings automatically, (b) scans generated code with real static
+analysis tools, and (c) drives an iterative repair loop until the scanner
+returns clean, running all of this simultaneously across multiple models for
+direct comparison. No such system exists in the literature.
+
+\section{Proposed System: LeBlanc}
+\label{sec:proposed}
+
+LeBlanc fills this gap. The name refers to the Le Blanc error, a classic
+software quality concept in which a defect introduced early in development is
+significantly cheaper to fix at that point than after deployment---a principle
+that applies directly to security vulnerabilities in generated code.
+
+The system is a three-engine pipeline:
+
+\begin{itemize}
+  \item \textbf{Engine A --- Prompt Enrichment.} A rule-based local system that
+        parses any coding prompt for security-relevant keywords and injects
+        structured CWE warnings before the LLM call. No LLM is involved in this
+        step; the enrichment is deterministic and reproducible.
+
+  \item \textbf{Engine B --- Static Analysis.} Once the LLM returns code,
+        Engine~B runs Semgrep and Bandit in parallel via subprocess calls and
+        maps their raw JSON output to structured findings: CWE identifier,
+        severity, line number, and vulnerability category.
+
+  \item \textbf{Engine C --- Iterative Repair.} When Engine~B finds
+        vulnerabilities, Engine~C builds a repair prompt from the scanner
+        findings and resubmits it to the originating LLM. The patched output is
+        immediately re-scanned. The loop runs for up to three iterations or until
+        the scanner returns clean.
+\end{itemize}
+
+The pipeline operates against multiple LLMs simultaneously. For any given prompt,
+results for all models and all modes (plain, enriched, enriched with repair) are
+collected, scanned, and stored in a single database run. The frontend displays
+a side-by-side comparison of vulnerability rates, scan findings, and repair
+convergence for each model.
+
+\section{Research Questions}
+\label{sec:rqs}
+
+LeBlanc is designed to answer five research questions from a single automated
+data collection run:
+
+\begin{description}
+  \item[RQ1 --- Enrichment Effect.] Does automated CWE-aware prompt enrichment
+        reduce vulnerability rates, and by how much per model?
+  \item[RQ2 --- Model Comparison.] Which model produces the safest code out of
+        the box? Does the ranking change after enrichment?
+  \item[RQ3 --- Repair Effectiveness.] How many repair iterations does each model
+        need to reach clean code? Is there a ceiling effect where some
+        vulnerability types never converge?
+  \item[RQ4 --- CWE Difficulty.] Which CWE categories are hardest for LLMs to
+        avoid and hardest to self-repair?
+  \item[RQ5 --- Generational Gap.] How does vulnerability rate and repair
+        convergence differ between small older models (Llama 3.1-8B) and
+        contemporary frontier models (Command-A, Gemini 2.5 Flash)?
+\end{description}
+
+\section{Scope and Limitations}
+\label{sec:scope}
+
+The current evaluation covers 33 prompts from the LLMSecEval benchmark, three
+models, and up to three repair iterations per run. The dataset and model set are
+intentionally bounded to allow one complete reproducible run within semester
+constraints. The LLMSecEval prompts are Python-only; Engine B is correspondingly
+configured for Python static analysis rules.
+
+The Llama 3.1-8B results should be read carefully. An 8-billion parameter model
+represents an earlier, smaller generation of open-weight LLMs. Its behaviour under
+prompt enrichment---where adding CWE warnings actually increased vulnerability
+rate---is consistent with published findings that small models degrade under
+complex instruction sets rather than improving. These results are included for
+completeness and as a motivating datapoint for the RQ5 generational gap analysis.
+They should not be taken as evidence that prompt enrichment is counterproductive.
+Future work will repeat the evaluation on Llama 3.3-70B, the direct
+next-generation successor in the same model family.
+
+\section{Contributions}
+\label{sec:contributions}
+
+This project makes three concrete contributions:
+
+\begin{enumerate}
+  \item \textbf{A working pipeline system.} LeBlanc is a fully implemented,
+        runnable web application that takes a coding prompt, runs it through all
+        three engines across multiple LLMs in parallel, and displays structured
+        results. The source code and database schema are reproducible.
+
+  \item \textbf{An empirical dataset.} Every pipeline run logs the original
+        prompt, enriched prompt, raw LLM output, extracted code, Semgrep and
+        Bandit findings, and every repair iteration to a SQLite database. The
+        collected dataset covers 321 total runs across three models, three modes,
+        and 33 prompts.
+
+  \item \textbf{Comparative results across five metrics.} Vulnerability rate,
+        relative improvement over the Copilot baseline, prompt enrichment gain,
+        repair convergence rate, and mean iterations to fix are all reported per
+        model and per CWE category against a well-known external baseline.
+\end{enumerate}
+
+\section{Report Organisation}
+\label{sec:organisation}
+
+Chapter~\ref{ch:literature} reviews the eight prior works that directly motivate
+LeBlanc's design and identifies the specific gap each one leaves.
+Chapter~\ref{ch:system} describes the system architecture, the three engines, and
+the implementation choices.
+Chapter~\ref{ch:methodology} defines the evaluation methodology: dataset
+selection, metrics definitions, and experimental setup.
+Chapter~\ref{ch:results} presents the results for all five research questions.
+Chapter~\ref{ch:discussion} interprets the findings, discusses limitations, and
+addresses the Llama 3.1-8B degradation result specifically.
+Chapter~\ref{ch:conclusion} summarises the work and outlines future directions,
+including the VS~Code extension and the planned larger-model evaluation.
+
+% =========================================================
+% CHAPTER 2 -- LITERATURE REVIEW  (pages 10-15 approx)
+% =========================================================
+\chapter{Literature Review}
+\label{ch:literature}
+
+This chapter reviews the eight papers that directly informed LeBlanc's design.
+Each is summarised on its contribution and the gap it leaves. The gaps are not
+criticisms---each paper is well-executed within its stated scope. They define the
+boundary of existing knowledge that LeBlanc is designed to extend.
+
+\section{Overview of the Review}
+\label{sec:litoverview}
+
+The review covers three themes: (1) vulnerability measurement studies that
+establish baseline rates, (2) enrichment and fine-tuning approaches that attempt
+to reduce rates at generation time, and (3) repair and feedback approaches that
+attempt to fix vulnerabilities after generation. LeBlanc sits at the intersection
+of all three.
+
+Table~\ref{tab:litgap} summarises each paper against the capabilities present in
+LeBlanc's design.
+
+\begin{table}[H]
+\centering
+\caption{Prior work and the gaps addressed by LeBlanc}
+\label{tab:litgap}
+\small
+\begin{tabularx}{\textwidth}{@{}lXXX@{}}
+\toprule
+\textbf{Paper} & \textbf{Core Contribution} & \textbf{Gap Left} & \textbf{LeBlanc's Answer} \\
+\midrule
+Pearce et al.\ (2022)~\cite{pearce2022asleep}
+  & Copilot security audit; 63.4\% VR baseline
+  & Single model; no repair; observational only
+  & Multi-model; automated repair; active pipeline \\[6pt]
+
+Tony et al.\ (2023)~\cite{tony2023llmseceval}
+  & LLMSecEval dataset; 120 NL prompts
+  & Single-turn evaluation; no enrichment or repair
+  & Enrichment + repair on LLMSecEval prompts \\[6pt]
+
+Khoury et al.\ (2023)~\cite{khoury2023secure}
+  & ChatGPT security evaluation across 21 scenarios
+  & Single model; no automated enrichment or repair
+  & Multi-model parallel evaluation \\[6pt]
+
+Tihanyi et al.\ (2024)~\cite{tihanyi2023secucogenicse}
+  & CWE-aware prompting; GPT-3.5 VR from 31\% to 86\%
+  & Single model; 180 samples; no repair loop
+  & Generalises enrichment to multiple models + adds repair \\[6pt]
+
+Wang et al.\ (2024)~\cite{codeseceval2023}
+  & 44-CWE benchmark; automated evaluation
+  & No enrichment engine; no iterative repair
+  & All three modes in one system \\[6pt]
+
+He \& Vechev (2024)~\cite{codeguard2024}
+  & Constrained decoding for secure generation
+  & Requires model internals; not API-accessible
+  & API-only; works on any black-box LLM \\[6pt]
+
+Siddiq et al.\ (2024)~\cite{hexacoder2024}
+  & Oracle-guided secure fine-tuning (HexaCoder)
+  & Fine-tune only; unusable on closed models
+  & No fine-tuning; prompt-side intervention \\[6pt]
+
+Zhou et al.\ (2024)~\cite{lpo2024}
+  & Preference optimisation for secure generation
+  & Requires retraining; not deployable on closed models
+  & Fully deployment-agnostic; API-level only \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Vulnerability Measurement Studies}
+\label{sec:litbaseline}
+
+\subsection{Pearce et al.\ (2022) --- Asleep at the Keyboard}
+\label{ssec:pearce}
+
+Pearce et al.~\cite{pearce2022asleep} conducted the first systematic security
+audit of GitHub Copilot's code generation. They constructed 89 scenarios spanning
+CWE categories including injection, memory safety, and cryptographic weaknesses,
+and evaluated Copilot's outputs using manual expert review and automated scanning.
+The study found that approximately 40\% of all generated code samples contained at
+least one security vulnerability, and that certain CWE categories---particularly
+CWE-89 (SQL Injection) and CWE-22 (Path Traversal)---appeared at high rates
+across multiple scenarios.
+
+The headline figure from the LLMSecEval subset is 63.4\%: across 82 prompts,
+52 produced vulnerable output. This number has become the standard external
+baseline for subsequent LLM security evaluation work, and LeBlanc uses it as the
+primary comparison point throughout the results chapter.
+
+The study's limitation from LeBlanc's perspective is that it is observational
+and single-model. It measures vulnerability rates but proposes no mechanism to
+reduce them. There is no enrichment, no repair loop, and no comparison between
+models. It establishes the problem but does not attack it.
+
+\subsection{Tony et al.\ (2023) --- LLMSecEval}
+\label{ssec:tony}
+
+Tony et al.~\cite{tony2023llmseceval} released the LLMSecEval dataset: 120
+natural-language prompts designed to elicit code containing common security
+weaknesses, drawn from the CWE Top 25. Each prompt is annotated with its target
+CWE and a ``vulnerable by design'' flag. The dataset covers Python scenarios for
+weaknesses including SQL injection, path traversal, hardcoded credentials, and
+weak cryptography.
+
+LeBlanc uses a 33-prompt subset of LLMSecEval as its evaluation dataset. The
+prompts are functional application requests---``write a Flask login endpoint,''
+``build a file upload handler''---rather than explicitly asking the model to write
+insecure code, which could trigger safety filters in commercial models.
+
+Tony et al.'s own evaluation is single-turn: they send each prompt to several
+models and measure how often the output contains the target CWE. No enrichment,
+repair, or multi-turn analysis is performed. LeBlanc extends this by running each
+LLMSecEval prompt through all three pipeline modes.
+
+\subsection{Khoury et al.\ (2023) --- How Secure Is Code Generated by ChatGPT?}
+\label{ssec:khoury}
+
+Khoury et al.~\cite{khoury2023secure} evaluated ChatGPT across 21 scenarios
+covering buffer overflows, SQL injection, cryptographic weaknesses, and other
+common CWE types. They found that approximately 16 of the 21 scenarios produced
+at least one piece of code containing a security vulnerability on the first
+request, although requesting revision sometimes caused ChatGPT to produce a
+secure version.
+
+The manual nature of their repair---a human explicitly requests a
+revision---distinguishes their work from LeBlanc's automated repair loop.
+Their observation that revision requests can be effective is empirical support
+for the premise behind Engine~C: the same LLM that produces vulnerable code can
+often fix it when given specific feedback about what is wrong.
+
+\section{Enrichment and Fine-Tuning Approaches}
+\label{sec:litenrich}
+
+\subsection{Tihanyi et al.\ (2024) --- SecuCoGen}
+\label{ssec:secucogen}
+
+Tihanyi et al.~\cite{tihanyi2023secucogenicse} is the most directly relevant
+prior work to LeBlanc's Engine~A. They constructed a 180-sample Python dataset
+of security-sensitive prompts and evaluated GPT-3.5-Turbo under two conditions:
+standard prompts and CWE-enriched prompts that explicitly named the vulnerability
+the model should avoid. For standard prompts, GPT-3.5 produced vulnerable code
+in 31\% of cases. For CWE-enriched prompts, this dropped to 14\%---a reduction
+of over 50\%.
+
+This result directly motivates LeBlanc's design. Engine~A automates and
+generalises the SecuCoGen enrichment strategy: instead of manually constructing
+CWE-enriched prompts, Engine~A applies a keyword-to-CWE mapping to any
+arbitrary prompt and injects the warnings automatically.
+
+The limitations SecuCoGen leaves are: single-model (GPT-3.5 only), fixed
+Python-only dataset, no post-generation repair, and no multi-model comparison.
+LeBlanc addresses all four.
+
+\subsection{Siddiq et al.\ (2024) --- HexaCoder}
+\label{ssec:hexacoder}
+
+HexaCoder~\cite{hexacoder2024} takes a different approach to reducing
+vulnerability rates: oracle-guided fine-tuning. The system generates a large
+training set of (vulnerable, secure) code pairs using an ``oracle''---a
+combination of scanner feedback and expert review---and fine-tunes a base LLM on
+this dataset. The resulting model generates substantially safer code than the
+baseline.
+
+The limitation relevant to LeBlanc is deployment: fine-tuning requires access
+to model weights. It cannot be applied to closed-source commercial APIs such as
+Gemini or Command-A. It also requires a significant training pipeline and compute
+resources, making it inaccessible to most practitioners who would benefit from
+safer code generation.
+
+LeBlanc's design explicitly rejects any fine-tuning dependency. All three engines
+operate at the API level. The system works against any model that can be accessed
+via a standard chat completion API, regardless of whether the weights are
+available.
+
+\subsection{Zhou et al.\ (2024) --- LPO}
+\label{ssec:lpo}
+
+Zhou et al.~\cite{lpo2024} propose Language Model Preference Optimisation (LPO),
+a reinforcement-learning-from-human-feedback variant applied to the security
+domain. They train a reward model that scores generated code on security criteria
+and fine-tune the base LLM to maximise that reward. The approach produces models
+with improved security properties compared to standard instruction-tuned baselines.
+
+The same deployment limitation applies as for HexaCoder: LPO requires full
+access to model weights and training infrastructure. It cannot be retrofitted to
+an existing closed-source API deployment.
+
+\section{Constrained Decoding and Hybrid Methods}
+\label{sec:litconstrained}
+
+\subsection{He and Vechev (2024) --- CODEGUARD+}
+\label{ssec:codeguard}
+
+He and Vechev~\cite{codeguard2024} present CODEGUARD+, a constrained decoding
+approach that modifies the token sampling process during generation to steer the
+model away from patterns associated with known vulnerabilities. The constraints
+are derived from a learned security classifier that operates on partial token
+sequences.
+
+CODEGUARD+ is technically sophisticated and demonstrably effective. However, it
+requires direct access to the model's logits at each decoding step, which is only
+possible when running the model locally. It cannot be applied to API-served models
+where only the final generated text is returned. This rules out its application
+to Gemini, Command-A, or any commercial model.
+
+\section{Evaluation Benchmarks}
+\label{sec:litbenchmark}
+
+\subsection{Wang et al.\ (2024) --- CodeSecEval}
+\label{ssec:codeseceval}
+
+Wang et al.~\cite{codeseceval2023} developed CodeSecEval, a benchmark covering
+44 CWE types with 180 samples. The benchmark provides both a generation task
+(produce code satisfying a description) and a repair task (fix a provided
+vulnerable snippet). They evaluate several models on both tasks and report
+per-CWE difficulty rankings.
+
+CodeSecEval is the broadest existing benchmark by CWE coverage, and its per-CWE
+difficulty rankings directly inform LeBlanc's RQ4 (CWE difficulty). The key gap
+is that CodeSecEval's repair task is static---a fixed vulnerable snippet is
+provided to the model as input, and the model produces one repair attempt. There
+is no iterative loop, no re-scanning after repair, and no automated detection of
+whether the repair succeeded. LeBlanc's Engine~C closes this gap.
+
+\section{Summary of Gaps}
+\label{sec:litgapsummary}
+
+Reviewing the eight papers, five consistent gaps emerge:
+
+\begin{enumerate}
+  \item \textbf{Single-model evaluation.} Six of the eight papers evaluate only
+        one model. Cross-model comparative data under identical conditions does
+        not exist prior to this work.
+
+  \item \textbf{Single-turn evaluation.} Seven of the eight papers test generation
+        once and stop. No study measures iterative repair under automated
+        re-scanning.
+
+  \item \textbf{No closed-loop enrichment.} SecuCoGen demonstrates that
+        CWE-aware prompting works but requires manual prompt construction. No
+        prior system automates enrichment from an arbitrary input prompt.
+
+  \item \textbf{No integrated system.} No prior work combines enrichment,
+        scanning, and repair in a single runnable tool. The components exist
+        in separate papers; they have never been assembled.
+
+  \item \textbf{No reproducible multi-model dataset.} No prior study logs all
+        runs---prompts, enriched prompts, raw outputs, scan findings, repair
+        iterations---to a queryable database for subsequent analysis.
+\end{enumerate}
+
+LeBlanc addresses all five. The system combines automated enrichment (closing
+gap~3), multi-model parallel evaluation (closing gap~1), iterative automated
+repair with re-scanning (closing gap~2), an integrated runnable pipeline
+(closing gap~4), and a logged SQLite dataset (closing gap~5).
+
+\printbibliography[heading=none]
+
+\end{document}
