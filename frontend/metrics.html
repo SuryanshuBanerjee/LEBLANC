@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LeBlanc — Metrics</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:        #F6F4F0;
+  --surface:   #FDFCFA;
+  --rule:      #E2DDD6;
+  --rule-2:    #CBC4BB;
+  --ink:       #1A1612;
+  --ink-2:     #6E675E;
+  --ink-3:     #B0A89F;
+  --ink-4:     #D8D2CB;
+  --terra:     oklch(48% 0.11 34);
+  --terra-mid: oklch(58% 0.10 34);
+  --terra-pale:oklch(95% 0.03 34);
+  --ok:   oklch(46% 0.12 152);
+  --warn: oklch(54% 0.12 68);
+  --bad:  oklch(50% 0.14 20);
+  --mono: 'JetBrains Mono',monospace;
+  --serif:'Playfair Display',Georgia,serif;
+  --sans: 'DM Sans',system-ui,sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-font-smoothing:antialiased}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);min-height:100vh;font-size:14px;line-height:1.5}
+
+.nav{position:sticky;top:0;z-index:100;background:var(--surface);border-bottom:1px solid var(--rule);display:flex;align-items:center;padding:0 56px;height:58px}
+.brand{font-family:var(--serif);font-style:italic;font-size:22px;color:var(--ink);text-decoration:none;letter-spacing:-0.3px;flex-shrink:0}
+.nav-rule{flex:1;height:1px;background:var(--rule);margin:0 40px}
+.nav-links{display:flex;gap:0}
+.nav-a{font-size:12.5px;font-weight:500;letter-spacing:0.3px;color:var(--ink-3);text-decoration:none;padding:8px 16px;border-radius:4px;transition:color .15s;position:relative}
+.nav-a:hover{color:var(--ink-2)}
+.nav-a.on{color:var(--terra)}
+.nav-a.on::after{content:'';position:absolute;bottom:-1px;left:16px;right:16px;height:1px;background:var(--terra)}
+
+.page{max-width:1280px;margin:0 auto;padding:48px 56px}
+
+.pg-head{border-bottom:1px solid var(--rule);padding-bottom:24px;margin-bottom:40px;display:flex;align-items:flex-end;justify-content:space-between;gap:20px}
+.pg-title{font-family:var(--serif);font-size:32px;font-weight:700;letter-spacing:-0.8px;color:var(--ink);line-height:1}
+.pg-sub{font-size:13px;color:var(--ink-3);margin-top:6px}
+.pg-note{font-size:12px;color:var(--ink-3);text-align:right;line-height:1.6;max-width:300px}
+
+/* stat row */
+.stat-row{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--rule);border-radius:8px;overflow:hidden;margin-bottom:48px;background:var(--surface)}
+.stat-card{padding:24px 28px;border-right:1px solid var(--rule)}
+.stat-card:last-child{border-right:none}
+.stat-num{font-family:var(--serif);font-size:36px;font-weight:700;letter-spacing:-1.5px;color:var(--ink);line-height:1}
+.stat-lbl{font-size:12px;color:var(--ink-3);margin-top:6px;letter-spacing:0.2px}
+.stat-delta{font-size:12px;font-weight:500;margin-top:4px}
+.stat-ok{color:var(--ok)}
+.stat-warn{color:var(--warn)}
+
+/* section headers */
+.sec{margin-bottom:48px}
+.sec-head{display:flex;align-items:center;gap:12px;margin-bottom:24px}
+.sec-num{font-family:var(--mono);font-size:10px;font-weight:500;letter-spacing:1.2px;text-transform:uppercase;color:var(--ink-3);flex-shrink:0}
+.sec-rule{flex:1;height:1px;background:var(--rule)}
+.sec-title{font-family:var(--serif);font-size:20px;font-weight:700;color:var(--ink);letter-spacing:-0.3px}
+.sec-desc{font-size:13px;color:var(--ink-3);margin-top:-16px;margin-bottom:20px;line-height:1.6}
+
+/* chart grid */
+.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:8px;overflow:hidden}
+.chart-card{background:var(--surface);padding:28px 28px 24px}
+.chart-card.wide{grid-column:1/-1}
+.chart-area{height:260px;position:relative}
+.chart-label{font-size:11px;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;color:var(--ink-3);margin-bottom:16px}
+
+/* metric cards (small inline stats) */
+.metric-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:8px;overflow:hidden}
+.metric-card{background:var(--surface);padding:20px 24px}
+.metric-model{font-family:var(--mono);font-size:11px;color:var(--ink-3);margin-bottom:6px;letter-spacing:0.3px}
+.metric-val{font-family:var(--serif);font-size:28px;font-weight:700;color:var(--ink);letter-spacing:-1px;line-height:1}
+.metric-sub{font-size:11.5px;color:var(--ink-3);margin-top:4px}
+
+/* table */
+.tbl-wrap{border:1px solid var(--rule);border-radius:8px;overflow:hidden;background:var(--surface)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead{background:var(--bg)}
+th{padding:10px 16px;text-align:left;font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.7px;color:var(--ink-3);border-bottom:1px solid var(--rule);white-space:nowrap}
+td{padding:10px 16px;border-bottom:1px solid rgba(26,22,18,0.05);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+.td-mono{font-family:var(--mono);font-size:12px}
+.td-vuln{color:var(--bad);font-weight:600}
+.td-clean{color:var(--ok);font-weight:600}
+.td-dim{color:var(--ink-3)}
+
+/* no data state */
+.no-data{padding:48px 20px;text-align:center}
+.no-data-word{font-family:var(--serif);font-style:italic;font-size:24px;color:var(--ink-4);display:block;margin-bottom:8px}
+.no-data-hint{font-size:13px;color:var(--ink-3)}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a class="brand" href="index.html">LeBlanc</a>
+  <div class="nav-rule"></div>
+  <div class="nav-links">
+    <a class="nav-a" href="index.html">Scanner</a>
+    <a class="nav-a" href="history.html">History</a>
+    <a class="nav-a on" href="metrics.html">Metrics</a>
+  </div>
+</nav>
+
+<div class="page" id="page">
+  <div class="pg-head">
+    <div>
+      <div class="pg-title">Research Metrics</div>
+      <div class="pg-sub">Full pipeline analysis — VR, RI, PEG, CR, MIF, RFR, AR, UFR</div>
+    </div>
+    <div class="pg-note">Populated from pipeline runs.<br>Copilot 2022 baseline: 63.4% VR on LLMSecEval.</div>
+  </div>
+
+  <!-- SUMMARY -->
+  <div class="stat-row">
+    <div class="stat-card"><div class="stat-num" id="s-runs">—</div><div class="stat-lbl">Total runs</div></div>
+    <div class="stat-card"><div class="stat-num" id="s-models">—</div><div class="stat-lbl">Models evaluated</div></div>
+    <div class="stat-card"><div class="stat-num" id="s-copilot">63.4%</div><div class="stat-lbl">Copilot baseline VR</div><div class="stat-delta stat-warn">52 / 82 prompts (2022)</div></div>
+    <div class="stat-card"><div class="stat-num" id="s-fixed">—</div><div class="stat-lbl">Auto-repaired</div><div class="stat-delta stat-ok" id="s-fixed-d"></div></div>
+  </div>
+
+  <!-- S1: VR + RI -->
+  <div class="sec">
+    <div class="sec-head"><span class="sec-num">01</span><span class="sec-title">Vulnerability Rate & Relative Improvement</span><span class="sec-rule"></span></div>
+    <p class="sec-desc"><b>VR</b> = (Vulnerable Runs / Total Runs) &times; 100%. <b>RI</b> = (Copilot 63.4% &minus; Model VR) / Copilot 63.4% &times; 100%. Dashed line = Copilot baseline.</p>
+    <div class="chart-grid">
+      <div class="chart-card">
+        <div class="chart-label">VR by model & mode (%)</div>
+        <div class="chart-area"><canvas id="cVR"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-label">Relative improvement over Copilot (%)</div>
+        <div class="chart-area"><canvas id="cRI"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- S2: PEG -->
+  <div class="sec">
+    <div class="sec-head"><span class="sec-num">02</span><span class="sec-title">Prompt Enrichment Gain</span><span class="sec-rule"></span></div>
+    <p class="sec-desc"><b>PEG</b> = (VR_plain &minus; VR_enriched) / VR_plain &times; 100%. How much does Engine A's CWE enrichment help?</p>
+    <div class="metric-row" id="peg-row"></div>
+  </div>
+
+  <!-- S3: Repair -->
+  <div class="sec">
+    <div class="sec-head"><span class="sec-num">03</span><span class="sec-title">Repair Effectiveness</span><span class="sec-rule"></span></div>
+    <p class="sec-desc"><b>CR@N</b> = (Cleaned within N iter / Total Entered) &times; 100%. <b>MIF</b> = Average iterations for fixed runs. <b>RFR</b> = (Unfixed / Total Entered) &times; 100%. Only counts runs that entered Engine C.</p>
+    <div class="chart-grid">
+      <div class="chart-card">
+        <div class="chart-label">CR@1 vs CR@3 — convergence rate (%)</div>
+        <div class="chart-area"><canvas id="cCR"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-label">MIF & RFR per model</div>
+        <div class="chart-area"><canvas id="cMIF"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- S4: Per-Category -->
+  <div class="sec">
+    <div class="sec-head"><span class="sec-num">04</span><span class="sec-title">Per-Category Breakdown</span><span class="sec-rule"></span></div>
+    <p class="sec-desc"><b>VR</b> = (Vuln Category Runs / Total Category Runs) &times; 100%. <b>CR</b> = (Cleaned in Category / Total Entered in Category) &times; 100%.</p>
+    <div class="chart-grid">
+      <div class="chart-card">
+        <div class="chart-label">VR by category — enriched mode (%)</div>
+        <div class="chart-area"><canvas id="cCatVR"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-label">Convergence rate by category (%)</div>
+        <div class="chart-area"><canvas id="cCatCR"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- S5: Intra-Model -->
+  <div class="sec">
+    <div class="sec-head"><span class="sec-num">05</span><span class="sec-title">Intra-Model Comparison</span><span class="sec-rule"></span></div>
+    <p class="sec-desc"><b>UFR</b> = (Times model alone failed / Total Prompts) &times; 100%. <b>AR</b> = (Times both models output same status / Total Prompts) &times; 100%.</p>
+    <div class="chart-grid">
+      <div class="chart-card">
+        <div class="chart-label">Unique failure rate — plain mode (%)</div>
+        <div class="chart-area"><canvas id="cUFR"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-label">Agreement rate — pairwise (%)</div>
+        <div class="chart-area"><canvas id="cAR"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- S6: Head to Head Table -->
+  <div class="sec">
+    <div class="sec-head"><span class="sec-num">06</span><span class="sec-title">Head-to-Head Table</span><span class="sec-rule"></span></div>
+    <p class="sec-desc">Per-prompt outcomes in plain mode. Shows where models agree and disagree.</p>
+    <div class="tbl-wrap" id="h2h-wrap">
+      <div class="no-data"><span class="no-data-word">No data.</span><span class="no-data-hint">Run prompts in the Scanner first.</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = "/api/metrics";
+
+/* Color palette — Hex for Canvas API compatibility */
+const C = ['#a85c3b', '#a53f46', '#3d7153', '#a8722b', '#436791'];
+
+function getOpts(yMax = null, isYPct = false, isXPct = false, hideLegend = false) {
+  const opts = {
+    animation: false,
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'bottom', display: !hideLegend }
+    },
+    scales: {}
+  };
+  
+  if (yMax != null) {
+    opts.scales.y = { max: yMax };
+    if (isYPct) opts.scales.y.ticks = { callback: v => v + '%' };
+  } else if (isYPct) {
+    opts.scales.y = { ticks: { callback: v => v + '%' } };
+  }
+
+  if (isXPct) {
+    opts.scales.x = { max: 100, ticks: { callback: v => v + '%' } };
+  }
+  return opts;
+}
+
+async function init() {
+  let d;
+  try {
+    const res = await fetch(API);
+    if (!res.ok) throw new Error();
+    d = await res.json();
+    if (!d || !d.summary) throw new Error();
+  } catch {
+    document.getElementById('page').innerHTML += '<div class="no-data"><span class="no-data-word">Could not load metrics.</span><span class="no-data-hint">Make sure the Flask server is running and has data.</span></div>';
+    return;
+  }
+
+  const S = d.summary;
+  const models = S.models || [];
+
+  // Summary stats
+  document.getElementById('s-runs').textContent = S.total_runs || '—';
+  document.getElementById('s-models').textContent = models.length || '—';
+  document.getElementById('s-copilot').textContent = S.copilot_vr + '%';
+  if (S.repair_fixed != null) {
+    document.getElementById('s-fixed').textContent = S.repair_fixed;
+    document.getElementById('s-fixed-d').textContent = S.repair_rate != null ? (S.repair_rate + '% of vulnerable') : '';
+  }
+
+  // S1: VR chart
+  if (d.vr && models.length) {
+    const modes = ['plain', 'enriched', 'enriched_repair'];
+    const modeLabels = ['Plain', 'Enriched', 'Enriched + Repair'];
+    
+    // Create a dummy dataset for Copilot line using line chart type
+    const datasets = modes.map((mode, i) => ({
+      type: 'bar',
+      label: modeLabels[i],
+      data: models.map(m => {
+        const val = d.vr[m] && d.vr[m][mode];
+        return val != null ? val : 0;
+      }),
+      backgroundColor: C[i % C.length],
+      borderRadius: 3,
+    }));
+
+    // Inject Copilot Reference Line as a dataset
+    datasets.push({
+      type: 'line',
+      label: 'Copilot 63.4%',
+      data: models.map(() => S.copilot_vr),
+      borderColor: 'rgba(26,22,18,0.3)',
+      borderDash: [5, 5],
+      pointRadius: 0,
+      borderWidth: 2,
+      fill: false
+    });
+
+    new Chart(document.getElementById('cVR'), {
+      type: 'bar',
+      data: { labels: models, datasets: datasets },
+      options: getOpts(100, true)
+    });
+  }
+
+  // S1: RI chart
+  if (d.ri && models.length) {
+    const modes = ['plain', 'enriched', 'enriched_repair'];
+    const modeLabels = ['Plain', 'Enriched', 'Enriched + Repair'];
+    new Chart(document.getElementById('cRI'), {
+      type: 'bar',
+      data: {
+        labels: models,
+        datasets: modes.map((mode, i) => ({
+          label: modeLabels[i],
+          data: models.map(m => {
+            const val = d.ri[m] && d.ri[m][mode];
+            return val != null ? val : 0;
+          }),
+          backgroundColor: C[i % C.length],
+          borderRadius: 3,
+        }))
+      },
+      options: getOpts(null, true)
+    });
+  }
+
+  // S2: PEG metric cards
+  if (d.peg) {
+    const row = document.getElementById('peg-row');
+    row.innerHTML = models.map(m => {
+      const val = d.peg[m];
+      return `<div class="metric-card">
+        <div class="metric-model">${m}</div>
+        <div class="metric-val">${val != null ? val + '%' : '—'}</div>
+        <div class="metric-sub">${val != null && val > 0 ? 'reduction from enrichment' : val != null && val < 0 ? 'enrichment increased VR' : val === 0 ? 'no change' : 'no data'}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // S3: CR chart
+  if (d.repair && models.length) {
+    new Chart(document.getElementById('cCR'), {
+      type: 'bar',
+      data: {
+        labels: models,
+        datasets: [
+          { label: 'CR@1', data: models.map(m => (d.repair[m] && d.repair[m].cr1) || 0), backgroundColor: C[2], borderRadius: 3 },
+          { label: 'CR@3', data: models.map(m => (d.repair[m] && d.repair[m].cr3) || 0), backgroundColor: C[0], borderRadius: 3 },
+        ]
+      },
+      options: getOpts(100, true)
+    });
+
+    // MIF + RFR
+    new Chart(document.getElementById('cMIF'), {
+      type: 'bar',
+      data: {
+        labels: models,
+        datasets: [
+          { label: 'MIF (avg iterations)', data: models.map(m => (d.repair[m] && d.repair[m].mif) || 0), backgroundColor: C[3], borderRadius: 3 },
+          { label: 'RFR (%)', data: models.map(m => (d.repair[m] && d.repair[m].rfr) || 0), backgroundColor: C[1], borderRadius: 3 },
+        ]
+      },
+      options: getOpts()
+    });
+  }
+
+  // S4: Per-Category
+  if (d.per_category) {
+    const cats = Object.keys(d.per_category);
+    const catData = d.per_category;
+
+    const vrDatasets = models.map((m, i) => ({
+      label: m,
+      data: cats.map(c => (catData[c].vr && catData[c].vr[m]) || 0),
+      backgroundColor: C[i % C.length],
+      borderRadius: 3,
+    }));
+    vrDatasets.push({
+      label: 'Copilot 2022',
+      data: cats.map(c => catData[c].copilot_vr || 0),
+      backgroundColor: 'rgba(26,22,18,0.15)',
+      borderRadius: 3,
+    });
+
+    const optsCat = getOpts();
+    optsCat.indexAxis = 'y';
+    optsCat.scales = { x: { max: 100, ticks: { callback: v => v + '%' } } };
+
+    new Chart(document.getElementById('cCatVR'), {
+      type: 'bar',
+      data: { labels: cats, datasets: vrDatasets },
+      options: optsCat
+    });
+
+    const optsCatCR = getOpts();
+    optsCatCR.indexAxis = 'y';
+    optsCatCR.scales = { x: { max: 100, ticks: { callback: v => v + '%' } } };
+
+    new Chart(document.getElementById('cCatCR'), {
+      type: 'bar',
+      data: {
+        labels: cats,
+        datasets: models.map((m, i) => ({
+          label: m,
+          data: cats.map(c => (catData[c].cr && catData[c].cr[m]) || 0),
+          backgroundColor: C[i % C.length],
+          borderRadius: 3,
+        }))
+      },
+      options: optsCatCR
+    });
+  }
+
+  // S5: Intra-Model
+  if (d.intra_model) {
+    const im = d.intra_model;
+    if (im.ufr) {
+      new Chart(document.getElementById('cUFR'), {
+        type: 'bar',
+        data: {
+          labels: models,
+          datasets: [{ label: 'UFR (%)', data: models.map(m => im.ufr[m] || 0), backgroundColor: C[1], borderRadius: 3 }]
+        },
+        options: getOpts(null, true, false, true)
+      });
+    }
+
+    if (im.agreement) {
+      const pairs = Object.keys(im.agreement);
+      new Chart(document.getElementById('cAR'), {
+        type: 'bar',
+        data: {
+          labels: pairs,
+          datasets: [{ label: 'Agreement (%)', data: pairs.map(p => im.agreement[p] || 0), backgroundColor: C[2], borderRadius: 3 }]
+        },
+        options: getOpts(100, true, false, true)
+      });
+    }
+
+    if (im.head_to_head && im.head_to_head.length) {
+      const wrap = document.getElementById('h2h-wrap');
+      let html = '<table><thead><tr><th>Prompt</th>';
+      models.forEach(m => html += `<th>${m}</th>`);
+      html += '<th>Copilot</th></tr></thead><tbody>';
+
+      im.head_to_head.forEach(row => {
+        html += `<tr><td class="td-mono">${row.prompt_id}</td>`;
+        models.forEach(m => {
+          const v = row[m];
+          html += `<td class="${v === 'VULN' ? 'td-vuln' : 'td-clean'}">${v || '—'}</td>`;
+        });
+        html += '<td class="td-dim">—</td></tr>';
+      });
+      html += '</tbody></table>';
+      wrap.innerHTML = html;
+    }
+  }
+}
+
+init();
+</script>
+</body>
+</html>

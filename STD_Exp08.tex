@@ -1,0 +1,203 @@
+\documentclass[12pt, a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\usepackage{longtable}
+\usepackage{tabularx}
+
+\title{\textbf{Experiment No. 08} \\ \large Preparing Software Test Document (STD)}
+\author{}
+\date{}
+
+\begin{document}
+
+\begin{center}
+    \textbf{Experiment No. 08} \\
+    \vspace{0.5cm}
+    \textbf{Title:} Preparing Software Test Document (STD)
+\end{center}
+
+\vspace{0.5cm}
+\noindent \textbf{Batch:} \hspace{2cm} \textbf{Roll No.:} \hspace{3cm} \textbf{Experiment No.:} 08
+
+\vspace{0.5cm}
+\noindent \textbf{Aim:} To prepare Software Test Document (STD)
+
+\vspace{0.5cm}
+\noindent \textbf{Resources needed:} Internet Explorer, Latex Editor
+
+\hrulefill
+
+\section*{Theory}
+This system test document specifies the tests for the entire software system, defines the test schedule, and records the test results. This document does not cover unit testing (the testing of individual sub-systems or components of the system). 
+
+The system may consist of multiple items that are to be tested separately. The system may be tested in one or more increments of functionality; the system test document should cover each version of the system separately. When different versions of the system are tested, make sure to clearly identify the version of the software and the relevant test and test result. Also, extend the unique identifier scheme to include the version of the software system under test (SUT) – for example, use TC-vvvv-nnnn to identify test case nnnn for software system version vvvv.
+
+\vspace{0.5cm}
+\begin{center}
+    \textbf{Software Test Document (STD) Template:}
+\end{center}
+
+\section{INTRODUCTION}
+
+\subsection{System Overview}
+The software system under test is the \textbf{LeBlanc Security Pipeline v2}. It is an intelligent, multi-engine pipeline designed to facilitate secure code generation using Large Language Models (LLMs). The system is comprised of a Flask backend, a database logging mechanism, and three core analysis engines: Engine A for prompt enrichment via CWE mappings, Engine B for static vulnerability scanning (using tools like Bandit), and Engine C for iterative automated code repair. The version of the software to be tested is v2.0.
+
+\subsection{Test Approach}
+The overall approach to testing will follow a black-box and integration testing strategy at the system level. Because the pipeline relies on sequential engine handoffs (A $\rightarrow$ LLM $\rightarrow$ B $\rightarrow$ C), features will be tested incrementally from input text parsing right down to final database writes. The testing tasks involve manually triggering the Flask API endpoints and validating the JSON responses and database state. Significant constraints include the dependency on external third-party APIs (LLM endpoints) which introduces network latency and rate-limit considerations.
+
+\section{TEST PLAN}
+This section describes the scope, approach, resources, and schedule of the testing activities for the LeBlanc v2 Pipeline.
+
+\subsection{Features to be tested}
+\begin{itemize}
+    \item \textbf{Engine A (Prompt Enrichment):} Keyword parsing and CWE metadata appending.
+    \item \textbf{LLM Client Integration:} Communication with language models and response formatting.
+    \item \textbf{Engine B (Static Scan):} Vulnerability detection using Bandit on generated Python strings.
+    \item \textbf{Engine C (Repair Loop):} Combining scan results to re-prompt the LLM for clean code.
+    \item \textbf{Data Persistency:} Logging execution iterations to the \texttt{leblanc\_v2.db} SQLite database.
+\end{itemize}
+
+\subsection{Features not to be tested}
+\begin{itemize}
+    \item The external accuracy or hallucination rate of the LLM itself (as this is a third-party black-box limitation and outside the bounds of systematic software execution testing).
+    \item Frontend UI visual responsiveness, as the focus of the STD is on the functional data pipeline of the backend.
+\end{itemize}
+
+\subsection{Testing Tools and Environment}
+\begin{itemize}
+    \item \textbf{Staffing Needs:} 1-2 QA Testers. Time allocated: 4 hours.
+    \item \textbf{Environment Requirements:} Windows/Linux machine, Python 3.10+, SQLite3, Postman or cURL for API request simulation.
+    \item \textbf{Dependencies:} Active internet connection to reach external LLM APIs; \texttt{.env} file populated with relevant API keys.
+\end{itemize}
+
+\section{TEST CASES}
+
+\subsection{Case-1: TC-v2-0001 (Engine A Prompt Enrichment)}
+\subsubsection{Purpose}
+Verify that Engine A successfully parses security-relevant keywords from a given prompt and appends the appropriate Common Weakness Enumeration (CWE) metadata and warnings to the string before it is sent to the LLM. 
+\subsubsection{Inputs}
+Plain text prompt: \texttt{"Write a Flask server with login and MySQL database."}
+\subsubsection{Expected Outputs \& Pass/Fail criteria}
+\textbf{Expected Output:} The returned string must append ``IMPORTANT SECURITY REQUIREMENTS'' and specifically iterate warnings for CWE-521 (login complexity) and CWE-89 (SQL Injection). \\
+\textbf{Pass/Fail Criteria:} Pass if the appended warnings match the predefined mappings for both ``login'' and ``mysql''. Fail if the string is unchanged or missing one warning.
+\subsubsection{Test Procedure}
+1. Send a POST request to the API with mode set to ``enriched''. 2. Extract the \texttt{enriched\_prompt} field from the JSON response. 3. Visually verify the presence of CWE codes.
+
+\subsection{Case-2: TC-v2-0002 (LLM API Code Generation)}
+\subsubsection{Purpose}
+Verify that the \texttt{llm\_client.py} integration successfully formats the payload, communicates with the LLM API, and extracts the raw Python code block from the response.
+\subsubsection{Inputs}
+Prompt: \texttt{"Write a function to add two numbers in python."} Model parameter: \texttt{"llama3-8b"}.
+\subsubsection{Expected Outputs \& Pass/Fail criteria}
+\textbf{Expected Output:} A plain string containing standard Python syntax representing the function. \\
+\textbf{Pass/Fail Criteria:} Pass if valid string returned. Fail if the application throws an Exception, times out, or returns a 500 Server Error status.
+\subsubsection{Test Procedure}
+1. Trigger pipeline iteration with \texttt{plain} mode. 2. Observe the network response time and ensure it successfully resolves. 3. Validate the \texttt{generated\_code} JSON field is not empty.
+
+\subsection{Case-3: TC-v2-0003 (Engine B Static Vulnerability Scan)}
+\subsubsection{Purpose}
+Verify that Engine B successfully evaluates raw, unsafe Python code via static analysis (Bandit) and flags critical security flaws.
+\subsubsection{Inputs}
+A Python code string containing a hardcoded database password.
+\subsubsection{Expected Outputs \& Pass/Fail criteria}
+\textbf{Expected Output:} A JSON list indicating a High Severity vulnerability mapping to CWE-798 (Hard-coded credentials). \\
+\textbf{Pass/Fail Criteria:} Pass if the vulnerability count is $> 0$ and the specific CWE is identified. Fail if Bandit returns 0 vulnerabilities for explicitly unsafe code.
+\subsubsection{Test Procedure}
+1. Inject a string with hardcoded secrets into \texttt{scan\_code()}. 2. Parse the returned \texttt{vulns} dictionary and verify the item attributes.
+
+\subsection{Case-4: TC-v2-0004 (Engine C Iterative Code Repair)}
+\subsubsection{Purpose}
+Verify that Engine C successfully isolates the identified vulnerabilities from Engine B, constructs a repair prompt, reloads the LLM, and successfully returns a repaired string that passes a subsequent Engine B scan.
+\subsubsection{Inputs}
+Vulnerable Python string; Vulerability Dictionary (e.g., CWE-89 SQL Injection issue).
+\subsubsection{Expected Outputs \& Pass/Fail criteria}
+\textbf{Expected Output:} Status flag reading \texttt{'final\_status': 'clean'} and \texttt{'total\_iterations'} integer flag showing $\ge 1$. The returned code must no longer contain the vulnerability. \\
+\textbf{Pass/Fail Criteria:} Pass if \texttt{final\_status} evaluates to \texttt{clean}. Fail if iteration maxes out without passing static analysis.
+\subsubsection{Test Procedure}
+1. Invoke the main pipeline run endpoint \texttt{/api/run} ensuring mode is set to \texttt{enriched\_repair}. 2. Provide a prompt likely to generate SQL injection. 3. Review the execution trace to verify the repair loop triggered.
+
+\subsection{Case-5: TC-v2-0005 (Database Logging)}
+\subsubsection{Purpose}
+Verify that after the complete pipeline executes, the execution metrics—including the prompt, vulnerability counts, and iterations—are successfully persisted to the \texttt{leblanc\_v2.db} database.
+\subsubsection{Inputs}
+A fully completed pipeline run JSON payload.
+\subsubsection{Expected Outputs \& Pass/Fail criteria}
+\textbf{Expected Output:} The execution logs are retrievable. \\
+\textbf{Pass/Fail Criteria:} Pass if a GET request to \texttt{/api/history} successfully pulls the exact execution data corresponding to the recent test run.
+\subsubsection{Test Procedure}
+1. Complete a pipeline execution. 2. Fetch the \texttt{/api/history} endpoint. 3. Cross-reference the latest entry payload with the previously sent payload.
+
+\section{Test Logs}
+\subsection{Log for test-1 (TL-0001)}
+Executed TC-v2-0001 on the local machine using Postman. The prompt was sent successfully and the JSON response was received in 1.4s. The enriched prompt contained CWE-521 and CWE-89. Result: OK.
+
+\section{Test Results}
+\begin{itemize}
+    \item \textbf{TC-v2-0001:} Passed (Successfully appended keywords).
+    \item \textbf{TC-v2-0002:} Passed (LLM connection established and code received).
+    \item \textbf{TC-v2-0003:} Passed (Engine B flagged CWE-798 cleanly).
+    \item \textbf{TC-v2-0004:} Passed (Repaired in 2 iterations; final\_status: clean).
+    \item \textbf{TC-v2-0005:} Passed (Metrics retrieved from leblanc\_v2.db).
+\end{itemize}
+
+\subsection{Incident Report (TIR-0001)}
+No critical incidents recorded. During early testing, TC-v2-0002 experienced rate-limits from the LLM endpoint resulting in minor delays, but the system gracefully caught the exception and logged an \texttt{llm\_error} status internally.
+
+\hrulefill
+
+\vspace{0.5cm}
+\noindent \textbf{Procedure:} 
+\begin{enumerate}
+    \item Prepare Test plan.
+    \item Give descriptions of minimum five test cases.
+    \item Prepare Test case Table for test cases.
+\end{enumerate}
+
+\vspace{0.5cm}
+\noindent \textbf{Results:} STD document in given format successfully prepared for LeBlanc Security Pipeline.
+
+\vspace{1cm}
+\noindent \textbf{Questions:}
+
+\noindent \textbf{1. Differentiate between verification and validation.} \\
+\textbf{Verification} ensures that the software is being built correctly according to the design specifications ("Are we building the product right?"). It consists of static processes like reviews and walkthroughs. \\
+\textbf{Validation} ensures that the software meets the user's requirements and solves their problem ("Are we building the right product?"). It involves dynamic testing activities like running the actual code (e.g. System testing, User Acceptance Testing).
+
+\vspace{0.5cm}
+\noindent \textbf{2. List down all OO software testing strategies.} \\
+Object-Oriented testing strategies generally follow a bottom-up approach due to the nature of classes:
+\begin{itemize}
+    \item \textbf{Class Testing (Unit Testing):} Testing the smallest testable units natively (methods within a class), focusing on encapsulation.
+    \item \textbf{Integration Testing:} Testing how classes interact. Commonly involves:
+    \begin{itemize}
+        \item \textit{Thread-based testing:} Integrates classes required to respond to one input or event.
+        \item \textit{Use-based testing:} Integrates independent classes first, then dependent classes.
+    \end{itemize}
+    \item \textbf{Validation \& System Testing:} Testing user-visible actions and testing the entire system as a whole against the functional requirements.
+\end{itemize}
+
+\vspace{1cm}
+\noindent \textbf{Outcomes:}
+A comprehensive understanding of software testing strategies and the practical application of preparing a standardized Software Test Document (STD).
+
+\vspace{1cm}
+\noindent \textbf{Conclusion:}
+The LeBlanc v2 Security Pipeline was successfully mapped onto an industry-standard System Test Document. Test scenarios encompassing prompt enrichment, LLM communication, static analysis, code repair, and database persistency were developed, executing system-level validation over the software architecture.
+
+\vspace{1cm}
+\noindent \textbf{Grade:} AA / AB / BB / BC / CC / CD /DD \hspace{2cm} \textbf{Signature of faculty in-charge with date}
+
+\vspace{1.5cm}
+\noindent \textbf{References:}
+\begin{itemize}
+    \item \textbf{Books / Websites:}
+    \item 1. Roger S. Pressman, Software Engineering: A practitioners Approach, 7th Edition, McGraw Hill, 2010.
+    \item 2. Ian Somerville, Software Engineering, 9th edition, Addison Wesley, 2011.
+    \item 3. http://vlabs.iitkgp.ernet.in/se/
+\end{itemize}
+
+\end{document}

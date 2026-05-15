@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LeBlanc — History</title>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:        #F6F4F0;
+  --surface:   #FDFCFA;
+  --rule:      #E2DDD6;
+  --rule-2:    #CBC4BB;
+  --ink:       #1A1612;
+  --ink-2:     #6E675E;
+  --ink-3:     #B0A89F;
+  --ink-4:     #D8D2CB;
+  --terra:     oklch(48% 0.11 34);
+  --terra-pale:oklch(95% 0.03 34);
+  --ok:   oklch(46% 0.12 152);
+  --warn: oklch(54% 0.12 68);
+  --bad:  oklch(50% 0.14 20);
+  --serif:'Playfair Display',Georgia,serif;
+  --sans: 'DM Sans',system-ui,sans-serif;
+  --mono: 'JetBrains Mono',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-font-smoothing:antialiased}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);min-height:100vh;font-size:14px;line-height:1.5}
+
+/* NAV */
+.nav{position:sticky;top:0;z-index:100;background:var(--surface);border-bottom:1px solid var(--rule);display:flex;align-items:center;padding:0 56px;height:58px}
+.brand{font-family:var(--serif);font-style:italic;font-size:22px;color:var(--ink);text-decoration:none;letter-spacing:-0.3px;flex-shrink:0}
+.nav-rule{flex:1;height:1px;background:var(--rule);margin:0 40px}
+.nav-links{display:flex;gap:0}
+.nav-a{font-size:12.5px;font-weight:500;letter-spacing:0.3px;color:var(--ink-3);text-decoration:none;padding:8px 16px;border-radius:4px;transition:color .15s;position:relative}
+.nav-a:hover{color:var(--ink-2)}
+.nav-a.on{color:var(--terra)}
+.nav-a.on::after{content:'';position:absolute;bottom:-1px;left:16px;right:16px;height:1px;background:var(--terra)}
+
+/* LAYOUT */
+.page{max-width:1400px;margin:0 auto;padding:48px 56px}
+
+.pg-head{border-bottom:1px solid var(--rule);padding-bottom:24px;margin-bottom:32px;display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.pg-title{font-family:var(--serif);font-size:32px;font-weight:700;letter-spacing:-0.8px;color:var(--ink);line-height:1}
+.pg-sub{font-size:13px;color:var(--ink-3);margin-top:6px}
+
+/* CONTROLS */
+.controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:20px}
+
+.search-box{
+  position:relative;
+  flex:1;min-width:220px;max-width:300px;
+}
+.search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--ink-3);font-size:13px;pointer-events:none}
+.search-in{
+  width:100%;
+  background:var(--surface);
+  border:1px solid var(--rule-2);
+  color:var(--ink);
+  padding:8px 12px 8px 30px;
+  border-radius:5px;
+  font-size:13px;
+  font-family:var(--sans);
+  outline:none;
+  transition:border .15s,box-shadow .15s;
+}
+.search-in:focus{border-color:var(--ink-2);box-shadow:0 0 0 3px rgba(26,22,18,.06)}
+.search-in::placeholder{color:var(--ink-4)}
+
+.sel{
+  background:var(--surface);
+  border:1px solid var(--rule-2);
+  color:var(--ink-2);
+  padding:8px 12px;
+  border-radius:5px;
+  font-size:13px;
+  font-family:var(--sans);
+  outline:none;
+  cursor:pointer;
+  transition:border .15s;
+}
+.sel:focus{border-color:var(--ink-2)}
+.sel option{background:#fff;color:var(--ink)}
+
+.row-ct{margin-left:auto;font-size:12px;color:var(--ink-3);white-space:nowrap}
+
+/* TABLE */
+.table-wrap{
+  border:1px solid var(--rule);
+  border-radius:8px;
+  overflow:hidden;
+  background:var(--surface);
+}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead{background:var(--bg)}
+th{
+  padding:11px 18px;
+  text-align:left;
+  font-size:10.5px;
+  font-weight:600;
+  text-transform:uppercase;
+  letter-spacing:0.7px;
+  color:var(--ink-3);
+  border-bottom:1px solid var(--rule);
+  white-space:nowrap;
+  user-select:none;
+  cursor:pointer;
+  transition:color .12s;
+}
+th:hover{color:var(--ink-2)}
+th.sorted{color:var(--terra)}
+td{padding:12px 18px;border-bottom:1px solid rgba(26,22,18,0.05);vertical-align:middle}
+tr.dr{cursor:pointer;transition:background .1s}
+tr.dr:hover{background:#F9F7F4}
+tr.dr:last-child td,tr.xr:last-child td{border-bottom:none}
+tr.xr td{background:var(--bg);border-bottom:1px solid var(--rule)}
+
+/* cell types */
+.cid{font-family:var(--mono);font-size:11px;color:var(--ink-3)}
+.cprompt{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
+.cdim{color:var(--ink-2)}
+.cmono{font-family:var(--mono);font-size:12px}
+
+/* model tag */
+.mtag{
+  display:inline-block;
+  font-family:var(--mono);
+  font-size:11px;
+  padding:3px 8px;
+  border-radius:3px;
+  background:var(--bg);
+  border:1px solid var(--rule-2);
+  color:var(--ink-2);
+  white-space:nowrap;
+}
+
+/* status — text only, colored */
+.sclean   {font-size:12.5px;font-weight:600;color:var(--ok)}
+.swarn    {font-size:12.5px;font-weight:600;color:var(--warn)}
+.sbad     {font-size:12.5px;font-weight:600;color:var(--bad)}
+.srep     {font-size:12.5px;font-weight:600;color:var(--terra)}
+.snil     {font-size:12.5px;color:var(--ink-3)}
+
+/* issue count */
+.vn-ok   {font-size:14px;font-weight:600;color:var(--ok)}
+.vn-warn {font-size:14px;font-weight:600;color:var(--warn)}
+.vn-bad  {font-size:14px;font-weight:600;color:var(--bad)}
+
+.cwe-row{display:flex;gap:5px;flex-wrap:wrap}
+.cwe{font-family:var(--mono);font-size:10.5px;padding:2px 6px;background:var(--bg);border:1px solid var(--rule);color:var(--ink-3);border-radius:3px}
+
+.sort-ind{margin-left:3px;font-size:9px;opacity:.6}
+
+/* EXPAND PANEL */
+.xpanel{padding:24px 24px 28px;display:grid;grid-template-columns:1fr 1fr;gap:32px}
+
+.xp-head{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.7px;color:var(--ink-3);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.xp-head::after{content:'';flex:1;height:1px;background:var(--rule)}
+
+.vi{padding:12px 0;border-bottom:1px solid var(--rule)}
+.vi:first-child{border-top:1px solid var(--rule)}
+.vi-row{display:flex;align-items:center;gap:10px;margin-bottom:3px}
+.vi-cwe{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--bad)}
+.vi-sev{font-size:11px;color:var(--ink-3);text-transform:uppercase;letter-spacing:0.4px}
+.vi-msg{font-size:13px;color:var(--ink-2);line-height:1.5}
+
+.tl-wrap{padding-left:14px;border-left:1.5px solid var(--rule)}
+.ti{font-size:13px;color:var(--ink-2);padding:5px 0;display:flex;align-items:center;gap:8px;border-bottom:1px dashed var(--rule)}
+.ti:last-child{border-bottom:none}
+.ti-pass{font-family:var(--mono);font-size:11px;color:var(--ink-3);min-width:48px}
+.ti-ok{color:var(--ok)}
+
+.code-pre{
+  background:#16130F;
+  border-radius:5px;
+  padding:16px;
+  font-family:var(--mono);
+  font-size:12px;line-height:1.7;
+  color:#CCC5BC;
+  max-height:260px;
+  overflow-y:auto;
+  white-space:pre-wrap;
+  word-break:break-word;
+}
+.code-pre::-webkit-scrollbar{width:3px}
+.code-pre::-webkit-scrollbar-thumb{background:#38322C;border-radius:99px}
+
+/* states */
+.loading-state{padding:72px 20px;text-align:center;color:var(--ink-3)}
+.empty-state{padding:80px 56px}
+.empty-word{font-family:var(--serif);font-style:italic;font-size:40px;color:var(--ink-4);display:block;margin-bottom:10px;letter-spacing:-1px}
+.empty-hint{font-size:13.5px;color:var(--ink-3)}
+.err-strip{padding:12px 0;color:var(--bad);font-size:13px;border-bottom:1px solid oklch(86% 0.06 20);margin-bottom:20px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useMemo } = React;
+const API = "/api";
+
+const COLS = [
+  { key:"id",               label:"ID",         sortFn:(a,b)=>a.id-b.id },
+  { key:"prompt_text",      label:"Prompt",     sortFn:(a,b)=>(a.prompt_text||"").localeCompare(b.prompt_text||"") },
+  { key:"model",            label:"Model",      sortFn:(a,b)=>(a.model||"").localeCompare(b.model||"") },
+  { key:"mode",             label:"Mode",       sortFn:(a,b)=>(a.mode||"").localeCompare(b.mode||"") },
+  { key:"vuln_count",       label:"Issues",     sortFn:(a,b)=>(a.vuln_count||0)-(b.vuln_count||0) },
+  { key:"final_status",     label:"Status",     sortFn:(a,b)=>(a.final_status||"").localeCompare(b.final_status||"") },
+  { key:"matched_cwes",     label:"CWEs",       sortFn:(a,b)=>(a.matched_cwes||[]).length-(b.matched_cwes||[]).length },
+  { key:"total_iterations", label:"Iterations", sortFn:(a,b)=>(a.total_iterations||0)-(b.total_iterations||0) },
+];
+const MODE_L = { plain:"Plain", enriched:"Enriched", enriched_repair:"Repair" };
+
+function StatusCell({ row }) {
+  if (row.final_status==="extraction_failed") return <span className="snil">parse error</span>;
+  if (row.final_status==="clean" && row.total_iterations>0) return <span className="srep">↻ repaired</span>;
+  if (row.final_status==="clean") return <span className="sclean">✓ clean</span>;
+  return <span className="sbad">{row.final_status||"unknown"}</span>;
+}
+
+function VCell({ n }) {
+  if (!n || n===0) return <span className="vn-ok">0</span>;
+  if (n<=2) return <span className="vn-warn">{n}</span>;
+  return <span className="vn-bad">{n}</span>;
+}
+
+function XPanel({ row }) {
+  const vulns = row.scan_results||[];
+  const rep = row.repair_result||{};
+  const iters = rep.iterations||[];
+  const initialCode = row.clean_code||row.generated_code||"—";
+  return (
+    <div className="xpanel">
+      <div>
+        <div className="xp-head">Vulnerabilities ({vulns.length})</div>
+        {vulns.length===0
+          ? <p style={{fontSize:13,color:'var(--ok)',padding:'8px 0'}}>No vulnerabilities detected.</p>
+          : vulns.map((v,i)=>(
+            <div key={i} className="vi">
+              <div className="vi-row">
+                <span className="vi-cwe">{(v.cwes||[]).join(", ")||v.cwe}</span>
+                {v.severity && <span className="vi-sev">{v.severity}</span>}
+              </div>
+              <div className="vi-msg">{v.message}</div>
+            </div>
+          ))
+        }
+        {iters.length>0 && (
+          <div style={{marginTop:20}}>
+            <div className="xp-head">Repair timeline</div>
+            <div className="tl-wrap">
+              {iters.map((it,i)=>(
+                <div key={i} style={{marginBottom: 12}}>
+                  <div className={`ti ${it.vulns_after===0?"ti-ok":""}`} style={{borderBottom:'none', paddingBottom: 4}}>
+                    <span className="ti-pass">pass {it.iteration}</span>
+                    <span>{it.vulns_before}</span>
+                    <span style={{color:'var(--ink-3)'}}>→</span>
+                    <span style={{fontWeight:600}}>{it.vulns_after}</span>
+                  </div>
+                  <details style={{fontSize: 12}}>
+                    <summary style={{cursor:'pointer', color:'var(--ink-3)', outline:'none', marginBottom: 4}}>View code delta</summary>
+                    <div className="code-pre" style={{padding: '10px 12px', fontSize: 11, maxHeight: 200}}>{it.code}</div>
+                  </details>
+                  <div style={{borderBottom:'1px dashed var(--rule)', marginTop: 8}}></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+      <div>
+        <div className="xp-head">{iters.length > 0 ? "Initial code" : "Final output"}</div>
+        <div className="code-pre">{initialCode}</div>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [rows, setRows]         = useState(null);
+  const [error, setError]       = useState(null);
+  const [search, setSearch]     = useState("");
+  const [modFil, setModFil]     = useState("all");
+  const [modeFil, setModeFil]   = useState("all");
+  const [catFil, setCatFil]     = useState("all");
+  const [avModels, setAvModels] = useState([]);
+  const [sortCol, setSortCol]   = useState("id");
+  const [sortDir, setSortDir]   = useState(-1);
+  const [expanded, setExpanded] = useState(null);
+
+  useEffect(()=>{
+    const p = new URLSearchParams(window.location.search);
+    const c = p.get('category'); if(c) setCatFil(c);
+    fetch(`${API}/history`)
+      .then(r=>r.json())
+      .then(d=>{ setRows(d); setAvModels([...new Set(d.map(r=>r.model))]); })
+      .catch(()=>setError("Could not reach the backend. Make sure the Flask server is running."));
+  },[]);
+
+  const handleSort = k => {
+    if (sortCol===k) setSortDir(d=>-d);
+    else { setSortCol(k); setSortDir(-1); }
+  };
+
+  const filtered = useMemo(()=>{
+    if (!rows) return [];
+    let out = rows;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      out = out.filter(r=>
+        (r.prompt_text||"").toLowerCase().includes(q)||
+        (r.model||"").toLowerCase().includes(q)||
+        (r.mode||"").toLowerCase().includes(q)||
+        (r.final_status||"").toLowerCase().includes(q)
+      );
+    }
+    if (modFil !=="all") out = out.filter(r=>r.model===modFil);
+    if (modeFil!=="all") out = out.filter(r=>r.mode===modeFil);
+    if (catFil !=="all") out = out.filter(r=>
+      (r.prompt_text||"").toLowerCase().includes(catFil.toLowerCase())||
+      (r.scan_results||[]).some(x=>x.category===catFil)
+    );
+    const col = COLS.find(c=>c.key===sortCol);
+    if (col) out=[...out].sort((a,b)=>sortDir*col.sortFn(a,b));
+    return out;
+  },[rows,search,modFil,modeFil,catFil,sortCol,sortDir]);
+
+  return (
+    <div>
+      <nav className="nav">
+        <a className="brand" href="index.html">LeBlanc</a>
+        <div className="nav-rule"/>
+        <div className="nav-links">
+          <a className="nav-a" href="index.html">Scanner</a>
+          <a className="nav-a on" href="history.html">History</a>
+          <a className="nav-a" href="metrics.html">Metrics</a>
+        </div>
+      </nav>
+
+      <div className="page">
+        <div className="pg-head">
+          <div>
+            <div className="pg-title">Run History</div>
+            <div className="pg-sub">All pipeline executions — click any row to expand</div>
+          </div>
+          {rows && <span className="row-ct">{filtered.length} of {rows.length} entries</span>}
+        </div>
+
+        {error && <div className="err-strip">{error}</div>}
+
+        <div className="controls">
+          <div className="search-box">
+            <span className="search-icon">⌕</span>
+            <input className="search-in" placeholder="Search prompts, models…" value={search} onChange={e=>setSearch(e.target.value)}/>
+          </div>
+          <select className="sel" value={catFil} onChange={e=>setCatFil(e.target.value)}>
+            <option value="all">All domains</option>
+            <option value="Injection">Injection</option>
+            <option value="Credential Management">Credential Management</option>
+            <option value="Access Control">Access Control</option>
+            <option value="Information Exposure">Information Exposure</option>
+            <option value="File Handling">File Handling</option>
+            <option value="Deserialization">Deserialization</option>
+            <option value="Path Traversal">Path Traversal</option>
+          </select>
+          <select className="sel" value={modFil} onChange={e=>setModFil(e.target.value)}>
+            <option value="all">All models</option>
+            {avModels.map(m=><option key={m} value={m}>{m}</option>)}
+          </select>
+          <select className="sel" value={modeFil} onChange={e=>setModeFil(e.target.value)}>
+            <option value="all">All modes</option>
+            <option value="plain">Plain</option>
+            <option value="enriched">Enriched</option>
+            <option value="enriched_repair">Repair</option>
+          </select>
+        </div>
+
+        <div className="table-wrap">
+          {rows===null && !error ? (
+            <div className="loading-state">Loading…</div>
+          ) : rows && rows.length===0 ? (
+            <div className="empty-state">
+              <span className="empty-word">Empty.</span>
+              <p className="empty-hint">Run prompts in the Scanner to populate this table.</p>
+            </div>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  {COLS.map(c=>(
+                    <th key={c.key} className={sortCol===c.key?"sorted":""} onClick={()=>handleSort(c.key)}>
+                      {c.label}{sortCol===c.key&&<span className="sort-ind">{sortDir===1?"↑":"↓"}</span>}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(row=>[
+                  <tr key={row.id} className="dr" onClick={()=>setExpanded(expanded===row.id?null:row.id)}>
+                    <td><span className="cid">#{row.id}</span></td>
+                    <td><span className="cprompt">{row.prompt_text}</span></td>
+                    <td><span className="mtag">{row.model}</span></td>
+                    <td><span className="cdim">{MODE_L[row.mode]||row.mode}</span></td>
+                    <td><VCell n={row.vuln_count||0}/></td>
+                    <td><StatusCell row={row}/></td>
+                    <td>
+                      {(row.matched_cwes||[]).length>0
+                        ? <div className="cwe-row">{row.matched_cwes.map((c,i)=><span key={i} className="cwe">{c}</span>)}</div>
+                        : <span style={{color:'var(--ink-4)'}}>—</span>
+                      }
+                    </td>
+                    <td><span className="cdim cmono">{row.total_iterations||"—"}</span></td>
+                  </tr>,
+                  expanded===row.id&&(
+                    <tr key={`${row.id}-x`} className="xr">
+                      <td colSpan={COLS.length}><XPanel row={row}/></td>
+                    </tr>
+                  )
+                ])}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
