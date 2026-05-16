@@ -21,6 +21,10 @@ app = Flask(__name__, static_folder='../frontend', static_url_path='/')
 # Restrict CORS in production!
 CORS(app, origins="*")
 
+@app.errorhandler(Exception)
+def handle_exception(e):
+    return jsonify({"error": str(e)}), 500
+
 @app.route('/')
 def index():
     return app.send_static_file('index.html')
@@ -48,13 +52,20 @@ def list_prompts():
 def _run_pipeline_iteration(prompt, prompt_id, model, mode):
     """Core logic for a single model/mode iteration."""
     # Engine A
-    if mode in ("enriched", "enriched_repair"):
-        enriched, matched_cwes, matched_keywords, keyword_cwe_pairs = enrich_prompt(prompt)
-    else:
+    try:
+        if mode in ("enriched", "enriched_repair"):
+            enriched, matched_cwes, matched_keywords, keyword_cwe_pairs = enrich_prompt(prompt)
+        else:
+            enriched = prompt
+            matched_cwes = []
+            matched_keywords = []
+            keyword_cwe_pairs = []
+    except Exception as e:
         enriched = prompt
         matched_cwes = []
         matched_keywords = []
         keyword_cwe_pairs = []
+        print(f"[Engine A] enrich_prompt failed: {e}")
 
     # LLM call
     try:
@@ -162,7 +173,17 @@ def compare_models():
                 )
 
         for future in tasks:
-            model_name, mode_name, entry = future.result()
+            try:
+                model_name, mode_name, entry = future.result()
+            except Exception as e:
+                # Surface the error as a JSON field rather than a 500 HTML page
+                entry = {"error": str(e)}
+                # We don't know which model/mode failed, so mark all pending ones
+                for m in models:
+                    for md in ["plain", "enriched", "enriched_repair"]:
+                        if md not in results[m]:
+                            results[m][md] = entry
+                continue
             results[model_name][mode_name] = entry
 
     return jsonify(results)
