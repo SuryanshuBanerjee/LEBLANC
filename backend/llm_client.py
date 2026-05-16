@@ -41,7 +41,7 @@ MODEL_CONFIGS = {
     "command-a": {"provider": "cohere", "api_model": "command-a-03-2025"},
 }
 
-def call_with_backoff(func, max_retries=5, base_delay=10):
+def call_with_backoff(func, max_retries=3, base_delay=2):
     """Executes a function with exponential backoff for API rate limits."""
     for i in range(max_retries):
         try:
@@ -51,16 +51,14 @@ def call_with_backoff(func, max_retries=5, base_delay=10):
             if "429" in err_str or "too many requests" in err_str or "rate limit" in err_str or "quota" in err_str:
                 if i == max_retries - 1:
                     raise e
-                # Wait 10, 20, 40, 80 seconds...
                 sleep_time = base_delay * (2 ** i)
                 print(f"[Rate Limited] Waiting {sleep_time}s to cooldown ({i+1}/{max_retries})...")
                 time.sleep(sleep_time)
             elif "503" in err_str or "overloaded" in err_str:
                 if i == max_retries - 1:
                     raise e
-                time.sleep(5) # Small backoff for generic server overloads
+                time.sleep(2)
             else:
-                # If it's a real hard-error (e.g., syntax or invalid key), fail instantly.
                 raise e
 
 def _call_gemini_internal(prompt, api_model):
